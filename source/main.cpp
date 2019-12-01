@@ -29,54 +29,41 @@ const char* Usage =
 "  -t, --threads            Number of checker threads in parallel. Default: 2\n";
 
 const static struct option CommandOptions[5] = {
-	{ "threads",        optional_argument, nullptr,  't' },
-	{ "help",           optional_argument, nullptr,  'h' },
-	{ nullptr,                no_argument, nullptr, '\0' }
+	{ "threads",  optional_argument, nullptr,  't' },
+	{ "help",     optional_argument, nullptr,  'h' },
+	{ nullptr,          no_argument, nullptr, '\0' }
 };
 
-std::array<std::uint32_t, 256> generate_crc_lookup_table() noexcept
+constexpr std::array<std::uint32_t, 256> CRC32Table(
+   std::uint32_t Polynomial
+) noexcept
 {
-	const std::uint32_t reversed_polynomial = 0xEDB88320u;
-
-	// This is a function object that calculates the checksum for a value,
-	// then increments the value, starting from zero.
-	struct byte_checksum
+	std::array<std::uint32_t, 256> Result = {};
+	std::uint32_t n = 0;
+	for( std::size_t i = 0; i < 256; ++i )
 	{
-		std::uint32_t operator()() noexcept
+		std::uint32_t CurChecksum = n++;
+		for( std::size_t j = 0; j < 8; ++j )
 		{
-			std::uint32_t CurChecksum = n++;
-
-			for (std::size_t i = 0; i < 8; ++i)
-			{
-				CurChecksum = (CurChecksum >> 1) ^ ((CurChecksum & 0x1u) ? reversed_polynomial : 0);
-			}
-
-			return CurChecksum;
+			CurChecksum = (CurChecksum >> 1) ^ (
+				(CurChecksum & 0x1u) ? Polynomial : 0
+			);
 		}
-		std::uint32_t n = 0;
-	};
-
-	std::array<std::uint32_t, 256> table = {};
-	std::generate(table.begin(), table.end(), byte_checksum{});
-
-	return table;
+		Result[i] = CurChecksum;
+	}
+	return Result;
 }
  
-// Calculates the CRC for any sequence of values. (You could use type traits and a
-// static assert to ensure the values can be converted to 8 bits.)
-template <typename InputIterator>
-std::uint32_t crc(InputIterator first, InputIterator last)
+template< typename InputIterator >
+std::uint32_t crc(InputIterator First, InputIterator Last)
 {
-  // Generate lookup table only on first use then cache it - this is thread-safe.
-  static auto const table = generate_crc_lookup_table();
+  static auto const Table = CRC32Table(0xEDB88320u);
  
-  // Calculate the CurChecksum - make sure to clip to 32 bits, for systems that don't
-  // have a true (fast) 32-bit type.
   return std::uint32_t{0xFFFFFFFFuL} &
-    ~std::accumulate(first, last,
-      ~std::uint32_t{0} & std::uint32_t{0xFFFFFFFFuL},
-        [](std::uint32_t CurChecksum, std::uint8_t CurValue) 
-          { return table[static_cast<std::uint8_t>(CurChecksum ^ CurValue)] ^ (CurChecksum >> 8); });
+	~std::accumulate(First, Last,
+	  ~std::uint32_t{0} & std::uint32_t{0xFFFFFFFFu},
+		[](std::uint32_t CurChecksum, std::uint8_t CurValue) 
+		  { return Table[static_cast<std::uint8_t>(CurChecksum ^ CurValue)] ^ (CurChecksum >> 8); });
 }
 
 int main( int argc, char* argv[] )
@@ -153,10 +140,7 @@ int main( int argc, char* argv[] )
 			std::istream_iterator<char>(CurFile),
 			std::istream_iterator<char>()
 		);
-		std::printf(
-			" %X\n",
-			CRC32
-		);
+		std::printf(" %X\n", CRC32);
 		// CurSettings.InputFile = fopen(argv[optind],"rb");
 		// if( CurSettings.InputFile == nullptr )
 		// {
