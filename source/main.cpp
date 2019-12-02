@@ -38,32 +38,35 @@ constexpr std::array<std::uint32_t, 256> CRC32Table(
    std::uint32_t Polynomial
 ) noexcept
 {
-	std::array<std::uint32_t, 256> Result = {};
-	std::uint32_t n = 0;
+	std::array<std::uint32_t, 256> Table = {};
+	std::uint8_t CurByte = 0;
 	for( std::size_t i = 0; i < 256; ++i )
 	{
-		std::uint32_t CurChecksum = n++;
-		for( std::size_t j = 0; j < 8; ++j )
+		std::uint32_t Remainder = CurByte++;
+		for( std::size_t CurBit = 0; CurBit < 8; ++CurBit )
 		{
-			CurChecksum = (CurChecksum >> 1) ^ (
-				(CurChecksum & 0x1u) ? Polynomial : 0
+			Remainder = (Remainder >> 1) ^ (
+				(Remainder & 0b1) ? Polynomial : 0
 			);
 		}
-		Result[i] = CurChecksum;
+		Table[i] = Remainder;
 	}
-	return Result;
+	return Table;
 }
  
 template< typename InputIterator >
 std::uint32_t crc(InputIterator First, InputIterator Last)
 {
   static auto const Table = CRC32Table(0xEDB88320u);
- 
-  return std::uint32_t{0xFFFFFFFFuL} &
-	~std::accumulate(First, Last,
-	  ~std::uint32_t{0} & std::uint32_t{0xFFFFFFFFu},
-		[](std::uint32_t CurChecksum, std::uint8_t CurValue) 
-		  { return Table[static_cast<std::uint8_t>(CurChecksum ^ CurValue)] ^ (CurChecksum >> 8); });
+
+  return ~std::accumulate(
+		First, Last,
+		std::uint32_t{0xFFFFFFFFu},
+		[](std::uint32_t CurChecksum, std::uint8_t CurByte) 
+		{
+			return Table[static_cast<std::uint8_t>(CurChecksum ^ CurByte)] ^ (CurChecksum >> 8);
+		}
+	);
 }
 
 int main( int argc, char* argv[] )
