@@ -67,13 +67,13 @@ constexpr std::array<std::array<std::uint32_t, 256>, 8> CRC32Table(
 	return Table;
 }
 
-
+// Todo: This should technically be "contiguous_iterator_tag" from C++20
 template< typename RandomIterator, std::uint32_t Polynomial >
 std::uint32_t Checksum(RandomIterator First, RandomIterator Last, std::random_access_iterator_tag)
 {
 	static constexpr auto Table = CRC32Table(Polynomial);
 	std::uint32_t CRC = ~0;
-	const auto Size = std::distance(First, Last);
+	const std::size_t Size = static_cast<std::size_t>(std::distance(First, Last));
 
 	const std::uint32_t* Input32 = reinterpret_cast<const std::uint32_t*>(&(*First));
 	std::size_t i;
@@ -102,8 +102,8 @@ std::uint32_t Checksum(RandomIterator First, RandomIterator Last, std::random_ac
 	);
 }
 
-template< typename RandomIterator, std::uint32_t Polynomial >
-std::uint32_t Checksum(RandomIterator First, RandomIterator Last, std::input_iterator_tag)
+template< typename Iterator, std::uint32_t Polynomial >
+std::uint32_t Checksum(Iterator First, Iterator Last, std::input_iterator_tag)
 {
 	static constexpr auto Table = CRC32Table(Polynomial);
 	return ~std::accumulate(
@@ -115,10 +115,10 @@ std::uint32_t Checksum(RandomIterator First, RandomIterator Last, std::input_ite
 	);
 }
 
-template< typename Iterator >
+template< std::uint32_t Polynomial, typename Iterator>
 inline std::uint32_t Checksum(Iterator First, Iterator Last)
 {
-	return Checksum<Iterator, 0xEDB88320u>(
+	return Checksum<Iterator, Polynomial>(
 		First, Last,
 		typename std::iterator_traits<Iterator>::iterator_category()
 	);
@@ -198,7 +198,7 @@ int main( int argc, char* argv[] )
 				PROT_READ, MAP_FILE | MAP_SHARED,
 				FileHandle, 0
 			);
-			CRC32 = Checksum<const std::uint8_t*>(
+			CRC32 = Checksum<0xEDB88320u, const std::uint8_t*>(
 				FileMap, FileMap + FileSize
 			);
 			munmap((void*)FileMap, FileSize);
@@ -207,7 +207,7 @@ int main( int argc, char* argv[] )
 		else
 		{
 			std::ifstream CurFile(CurPath, std::ios::binary);
-			CRC32 = Checksum(
+			CRC32 = Checksum<0xEDB88320u>(
 				std::istreambuf_iterator<char>(CurFile),
 				std::istreambuf_iterator<char>()
 			);
