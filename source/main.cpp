@@ -193,13 +193,15 @@ int main( int argc, char* argv[] )
 			// Use a faster mmap path.
 			const auto FileSize = std::filesystem::file_size(CurPath);
 			const auto FileHandle = open(CurPath.c_str(), O_RDONLY, 0);
-			const std::uint8_t* FileMap = (const std::uint8_t*)mmap(
+			void* FileMap = mmap(
 				nullptr, FileSize,
-				PROT_READ, MAP_FILE | MAP_SHARED,
+				PROT_READ, MAP_SHARED | MAP_POPULATE,
 				FileHandle, 0
 			);
+			madvise(FileMap, FileSize, MADV_SEQUENTIAL | MADV_WILLNEED);
 			CRC32 = Checksum<0xEDB88320u, const std::uint8_t*>(
-				FileMap, FileMap + FileSize
+				reinterpret_cast<const std::uint8_t*>(FileMap),
+				reinterpret_cast<const std::uint8_t*>(FileMap) + FileSize
 			);
 			munmap((void*)FileMap, FileSize);
 			close(FileHandle);
