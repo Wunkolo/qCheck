@@ -18,8 +18,8 @@ struct Settings
 {
 	std::filesystem::path ChecksumFile;
 	std::vector<std::filesystem::path> InputFiles;
-	std::size_t Threads   = 2;
-	bool Verbose = true;
+	std::size_t Threads            = 2;
+	bool Verbose                   = true;
 };
 
 const char* Usage = 
@@ -39,29 +39,25 @@ constexpr std::array<std::uint32_t, 256> CRC32Table(
 ) noexcept
 {
 	std::array<std::uint32_t, 256> Table = {};
-	std::uint8_t CurByte = 0;
-	for( std::size_t i = 0; i < 256; ++i )
+	for( std::size_t i = 0; i < Table.size(); ++i )
 	{
-		std::uint32_t Remainder = CurByte++;
+		std::uint32_t CRC = i;
 		for( std::size_t CurBit = 0; CurBit < 8; ++CurBit )
 		{
-			Remainder = (Remainder >> 1) ^ (
-				(Remainder & 0b1) ? Polynomial : 0
-			);
+			CRC = (CRC >> 1) ^ ( -(CRC & 0b1) & Polynomial);
 		}
-		Table[i] = Remainder;
+		Table[i] = CRC;
 	}
 	return Table;
 }
- 
+
 template< typename InputIterator >
 std::uint32_t crc(InputIterator First, InputIterator Last)
 {
-  static auto const Table = CRC32Table(0xEDB88320u);
+	static auto const Table = CRC32Table(0xEDB88320u);
 
-  return ~std::accumulate(
-		First, Last,
-		std::uint32_t{0xFFFFFFFFu},
+	return ~std::accumulate(
+		First, Last, ~std::uint32_t(0),
 		[](std::uint32_t CurChecksum, std::uint8_t CurByte) 
 		{
 			return Table[static_cast<std::uint8_t>(CurChecksum ^ CurByte)] ^ (CurChecksum >> 8);
@@ -138,7 +134,7 @@ int main( int argc, char* argv[] )
 
 		CurSettings.InputFiles.emplace_back(CurPath);
 
-		std::ifstream CurFile(CurPath, std::ios::binary);
+		std::ifstream CurFile(CurPath);
 		const std::uint32_t CRC32 = crc(
 			std::istream_iterator<char>(CurFile),
 			std::istream_iterator<char>()
