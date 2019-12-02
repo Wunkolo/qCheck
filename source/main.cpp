@@ -54,13 +54,12 @@ constexpr std::array<std::uint32_t, 256> CRC32Table(
 template< typename InputIterator >
 std::uint32_t crc(InputIterator First, InputIterator Last)
 {
-	static auto const Table = CRC32Table(0xEDB88320u);
-
+	static constexpr auto Table = CRC32Table(0xEDB88320u);
 	return ~std::accumulate(
-		First, Last, ~std::uint32_t(0),
-		[](std::uint32_t CurChecksum, std::uint8_t CurByte) 
+		First, Last, 0xFFFFFFFFu,
+		[](std::uint32_t CRC, std::uint8_t Byte) 
 		{
-			return Table[static_cast<std::uint8_t>(CurChecksum ^ CurByte)] ^ (CurChecksum >> 8);
+			return (CRC >> 8) ^ Table[std::uint8_t(CRC) ^ Byte];
 		}
 	);
 }
@@ -134,10 +133,10 @@ int main( int argc, char* argv[] )
 
 		CurSettings.InputFiles.emplace_back(CurPath);
 
-		std::ifstream CurFile(CurPath);
+		std::ifstream CurFile(CurPath, std::ios::binary);
 		const std::uint32_t CRC32 = crc(
-			std::istream_iterator<char>(CurFile),
-			std::istream_iterator<char>()
+			std::istreambuf_iterator<char>(CurFile),
+			std::istreambuf_iterator<char>()
 		);
 		std::printf(" %X\n", CRC32);
 		// CurSettings.InputFile = fopen(argv[optind],"rb");
