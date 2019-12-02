@@ -38,11 +38,11 @@ const static struct option CommandOptions[5] = {
 	{ nullptr,          no_argument, nullptr, '\0' }
 };
 
-constexpr std::array<std::array<std::uint32_t, 256>, 4> CRC32Table(
+constexpr std::array<std::array<std::uint32_t, 256>, 8> CRC32Table(
 	std::uint32_t Polynomial
 ) noexcept
 {
-	std::array<std::array<std::uint32_t, 256>, 4> Table = {};
+	std::array<std::array<std::uint32_t, 256>, 8> Table = {};
 	for( std::size_t i = 0; i < 256; ++i )
 	{
 		std::uint32_t CRC = i;
@@ -58,6 +58,10 @@ constexpr std::array<std::array<std::uint32_t, 256>, 4> CRC32Table(
 		Table[1][i] = (Table[0][i] >> 8) ^ Table[0][std::uint8_t(Table[0][i])];
 		Table[2][i] = (Table[1][i] >> 8) ^ Table[0][std::uint8_t(Table[1][i])];
 		Table[3][i] = (Table[2][i] >> 8) ^ Table[0][std::uint8_t(Table[2][i])];
+		Table[4][i] = (Table[3][i] >> 8) ^ Table[0][std::uint8_t(Table[3][i])];
+		Table[5][i] = (Table[4][i] >> 8) ^ Table[0][std::uint8_t(Table[4][i])];
+		Table[6][i] = (Table[5][i] >> 8) ^ Table[0][std::uint8_t(Table[5][i])];
+		Table[7][i] = (Table[6][i] >> 8) ^ Table[0][std::uint8_t(Table[6][i])];
 	}
 
 	return Table;
@@ -68,8 +72,29 @@ template< typename RandomIterator, std::uint32_t Polynomial >
 std::uint32_t Checksum(RandomIterator First, RandomIterator Last, std::random_access_iterator_tag)
 {
 	static constexpr auto Table = CRC32Table(Polynomial);
+	std::uint32_t CRC = ~0;
+	const auto Size = std::distance(First, Last);
+
+	const std::uint32_t* Input32 = reinterpret_cast<const std::uint32_t*>(&(*First));
+	std::size_t i;
+	// Slice by 8
+	for( i = 0; i < Size / 8; ++i )
+	{
+		const std::uint32_t InputLo = *Input32++ ^ CRC;
+		const std::uint32_t InputHi = *Input32++;
+		CRC = Table[7][std::uint8_t(InputLo      )] ^
+			  Table[6][std::uint8_t(InputLo >>  8)] ^
+			  Table[5][std::uint8_t(InputLo >> 16)] ^
+			  Table[4][std::uint8_t(InputLo >> 24)] ^
+			  Table[3][std::uint8_t(InputHi      )] ^
+			  Table[2][std::uint8_t(InputHi >>  8)] ^
+			  Table[1][std::uint8_t(InputHi >> 16)] ^
+			  Table[0][std::uint8_t(InputHi >> 24)];
+	}
+
+	First += (i * 8);
 	return ~std::accumulate(
-		First, Last, ~std::uint32_t(0),
+		First, Last, CRC,
 		[](std::uint32_t CRC, std::uint8_t Byte) 
 		{
 			return (CRC >> 8) ^ Table[0][std::uint8_t(CRC) ^ Byte];
