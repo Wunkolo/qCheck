@@ -82,14 +82,15 @@ std::uint32_t Checksum(RandomIterator First, RandomIterator Last, std::random_ac
 	{
 		const std::uint32_t InputLo = *Input32++ ^ CRC;
 		const std::uint32_t InputHi = *Input32++;
-		CRC = Table[7][std::uint8_t(InputLo      )] ^
-			  Table[6][std::uint8_t(InputLo >>  8)] ^
-			  Table[5][std::uint8_t(InputLo >> 16)] ^
-			  Table[4][std::uint8_t(InputLo >> 24)] ^
-			  Table[3][std::uint8_t(InputHi      )] ^
-			  Table[2][std::uint8_t(InputHi >>  8)] ^
-			  Table[1][std::uint8_t(InputHi >> 16)] ^
-			  Table[0][std::uint8_t(InputHi >> 24)];
+		CRC =
+			Table[7][std::uint8_t(InputLo      )] ^
+			Table[6][std::uint8_t(InputLo >>  8)] ^
+			Table[5][std::uint8_t(InputLo >> 16)] ^
+			Table[4][std::uint8_t(InputLo >> 24)] ^
+			Table[3][std::uint8_t(InputHi      )] ^
+			Table[2][std::uint8_t(InputHi >>  8)] ^
+			Table[1][std::uint8_t(InputHi >> 16)] ^
+			Table[0][std::uint8_t(InputHi >> 24)];
 	}
 
 	First += (i * 8);
@@ -173,8 +174,13 @@ int main( int argc, char* argv[] )
 
 	// Check for config errors here
 
-	// Parse files
-	for( std::size_t i = 0; i < argc; ++i )
+	// Parse file list
+	std::fprintf(
+		stdout,
+		"; Generated with qCheck by Wunkolo [ Build: " __TIMESTAMP__" ]\n"
+	);
+
+	for( std::intmax_t i = 0; i < argc; ++i )
 	{
 		const std::filesystem::path CurPath(argv[i]);
 		if( !std::filesystem::exists(CurPath) )
@@ -182,11 +188,24 @@ int main( int argc, char* argv[] )
 			std::fprintf(stderr, "File does not exist: %s\n", argv[i]);
 			continue;
 		}
-
 		std::error_code CurError;
+		std::size_t FileSize = 0;
+		if( std::filesystem::is_regular_file(CurPath, CurError) )
+		{
+			FileSize = std::filesystem::file_size(CurPath);
+		}
+		CurSettings.InputFiles.emplace_back(CurPath);
+		std::fprintf(
+			stdout, "; %zu %s\n",
+			FileSize,
+			CurPath.filename().c_str()
+		);
+	}
 
+	for( const auto& CurPath : CurSettings.InputFiles )
+	{
 		std::uint32_t CRC32 = 0;
-
+		std::error_code CurError;
 		if( std::filesystem::is_regular_file(CurPath, CurError) )
 		{
 			// Regular file sitting on some storage media, unchanging
@@ -214,18 +233,11 @@ int main( int argc, char* argv[] )
 				std::istreambuf_iterator<char>()
 			);
 		}
-		std::fputs(CurPath.c_str(), stdout);
-
-		CurSettings.InputFiles.emplace_back(CurPath);
-		std::printf(" %X\n", CRC32);
-		// CurSettings.InputFile = fopen(argv[optind],"rb");
-		// if( CurSettings.InputFile == nullptr )
-		// {
-		// 	std::fprintf(
-		// 		stderr, "Error opening input file: %s\n", argv[optind]
-		// 	);
-		// }
-		// return EXIT_FAILURE;
+		std::fprintf(
+			stdout, "%s %08X\n",
+			CurPath.filename().c_str(),
+			CRC32
+		);
 	}
 
 	return EXIT_SUCCESS;
