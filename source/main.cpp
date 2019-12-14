@@ -18,6 +18,11 @@
 #include <sys/mman.h>
 #include <fcntl.h>
 
+
+#ifdef __AVX2__
+#include <immintrin.h>
+#endif
+
 struct Settings
 {
 	std::filesystem::path ChecksumFile;
@@ -67,6 +72,21 @@ constexpr std::array<std::array<std::uint32_t, 256>, 8> CRC32Table(
 	return Table;
 }
 
+#ifdef __AVX2__
+inline std::uint32_t _mm256_hxor_epi32(__m256i a)
+{
+	// Xor top half with bottom half
+	const __m128i XorReduce128 = _mm_xor_si128(
+		_mm256_extracti128_si256(a, 1),
+		_mm256_extracti128_si256(a, 0)
+	);
+	const std::uint64_t XorReduce64 =
+		_mm_extract_epi64(XorReduce128, 1) ^
+		_mm_extract_epi64(XorReduce128, 0);
+	return XorReduce64 ^ (XorReduce64 >> 32);
+}
+#endif
+
 // Todo: This should technically be "contiguous_iterator_tag" from C++20
 template< typename RandomIterator, std::uint32_t Polynomial >
 std::uint32_t Checksum(RandomIterator First, RandomIterator Last, std::random_access_iterator_tag)
@@ -77,7 +97,44 @@ std::uint32_t Checksum(RandomIterator First, RandomIterator Last, std::random_ac
 
 	const std::uint32_t* Input32 = reinterpret_cast<const std::uint32_t*>(&(*First));
 	std::size_t i;
+
 	// Slice by 8
+#ifdef __AVX2__
+	for( i = 0; i < Size / 8; ++i )
+	{
+		const std::uint64_t Input64 =
+			*reinterpret_cast<const std::uint64_t*>(Input32) ^ CRC;
+		Input32 += 2;
+		const __m256i Indices = _mm256_shuffle_epi8(
+			_mm256_set1_epi64x(Input64),
+			_mm256_set_epi8(
+				~0, ~0, ~0, 7,
+				~0, ~0, ~0, 6,
+				~0, ~0, ~0, 5,
+				~0, ~0, ~0, 4,
+				~0, ~0, ~0, 3,
+				~0, ~0, ~0, 2,
+				~0, ~0, ~0, 1,
+				~0, ~0, ~0, 0
+			)
+		);
+		const __m256i ArrayOffset = _mm256_set_epi32(
+			(sizeof(typename decltype(Table)::value_type) / 4) * 0,
+			(sizeof(typename decltype(Table)::value_type) / 4) * 1,
+			(sizeof(typename decltype(Table)::value_type) / 4) * 2,
+			(sizeof(typename decltype(Table)::value_type) / 4) * 3,
+			(sizeof(typename decltype(Table)::value_type) / 4) * 4,
+			(sizeof(typename decltype(Table)::value_type) / 4) * 5,
+			(sizeof(typename decltype(Table)::value_type) / 4) * 6,
+			(sizeof(typename decltype(Table)::value_type) / 4) * 7 
+		);
+		const __m256i Gather = _mm256_i32gather_epi32(
+			reinterpret_cast<const std::int32_t*>(Table.data()),
+			_mm256_add_epi32(Indices, ArrayOffset), sizeof(std::uint32_t)
+		);
+		CRC = _mm256_hxor_epi32(Gather);
+	}
+#else
 	for( i = 0; i < Size / 8; ++i )
 	{
 		const std::uint32_t InputLo = *Input32++ ^ CRC;
@@ -92,6 +149,7 @@ std::uint32_t Checksum(RandomIterator First, RandomIterator Last, std::random_ac
 			Table[1][std::uint8_t(InputHi >> 16)] ^
 			Table[0][std::uint8_t(InputHi >> 24)];
 	}
+#endif
 
 	First += (i * 8);
 	return ~std::accumulate(
