@@ -6,9 +6,11 @@
 #include <charconv>
 #include <algorithm>
 #include <numeric>
+#include <mutex>
 #include <thread>
 
 #include <vector>
+#include <queue>
 #include <filesystem>
 #include <fstream>
 #include <iterator>
@@ -219,7 +221,8 @@ int Check(const Settings& CurSettings)
 		std::filesystem::path FilePath;
 		std::uint32_t Checksum;
 	};
-	std::vector<CheckEntry> CheckList;
+	std::mutex QueueLock;
+	std::queue<CheckEntry> Checkqueue;
 	std::string CurLine;
 	std::ifstream CheckFile(CurSettings.ChecksumFile);
 	if( !CheckFile )
@@ -240,31 +243,52 @@ int Check(const Settings& CurSettings)
 			// Error parsing checksum value
 			continue;
 		}
-		CheckList.push_back(
+		Checkqueue.push(
 			{ std::string_view(CurLine).substr(0, BreakPos), CheckValue }
 		);
 	}
 
 	std::vector<std::thread> Workers;
 
-	for( std::size_t i = 0; i < CheckList.size(); ++i )
+	for( std::size_t i = 0; i < CurSettings.Threads; ++i )
 	{
 		Workers.push_back(
-			std::thread([&CheckList]
+			std::thread([&QueueLock, &Checkqueue]
 			(std::size_t Index)
 			{
-				const CheckEntry& CurEntry = CheckList[Index];
-				const bool Valid = CurEntry.Checksum == ChecksumFile(CurEntry.FilePath);
-				std::printf(
-					"%s %08X %s\n",
-					CurEntry.FilePath.c_str(), CurEntry.Checksum,
-					Valid ? "OK":"FAIL"
-				);
+				while( true )
+				{
+					CheckEntry CurEntry{};
+					{
+						std::unique_lock<std::mutex> lock(QueueLock);
+						if(Checkqueue.empty()) return;
+						CurEntry = Checkqueue.front();
+						Checkqueue.pop();
+					}
+					if( std::filesystem::is_regular_file(CurEntry.FilePath) )
+					{
+						const std::uint32_t CurSum = ChecksumFile(CurEntry.FilePath);
+						const bool Valid = CurEntry.Checksum == CurSum;
+						std::printf(
+							"\e[36m%s\t\e[37m%08X\e[0m==%s%08X\t%s\e[0m\n",
+							CurEntry.FilePath.c_str(), CurEntry.Checksum,
+							Valid ? "\e[32m" : "\e[31m", CurSum,
+							Valid ? "\e[32mOK" : "\e[31mFAIL"
+						);
+					}
+					else
+					{
+						std::printf(
+							"\e[36m%s\t\e[37m%08X\t\t\e[31mError opening file\n",
+							CurEntry.FilePath.c_str(), CurEntry.Checksum
+						);
+					}
+				}
 			}, i)
 		);
 	}
 
-	for( std::size_t i = 0; i < CheckList.size(); ++i )
+	for( std::size_t i = 0; i < CurSettings.Threads; ++i )
 	{
 		Workers[i].join();
 	}
@@ -305,8 +329,7 @@ int main( int argc, char* argv[] )
 		case 'c':
 		{
 			CurSettings.ChecksumFile = std::filesystem::path(optarg);
-			//break;
-			return Check(CurSettings);
+			break;
 		}
 		default:
 		{
@@ -319,6 +342,8 @@ int main( int argc, char* argv[] )
 	argv += optind;
 
 	// Check for config errors here
+
+	if( !CurSettings.ChecksumFile.empty() ) return Check(CurSettings);
 
 	// Parse file list
 	std::fprintf(
