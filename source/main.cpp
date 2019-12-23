@@ -6,6 +6,7 @@
 #include <charconv>
 #include <algorithm>
 #include <numeric>
+#include <thread>
 
 #include <vector>
 #include <filesystem>
@@ -177,6 +178,101 @@ inline std::uint32_t Checksum(Iterator First, Iterator Last)
 	);
 }
 
+std::uint32_t ChecksumFile( const std::filesystem::path& Path )
+{
+	std::uint32_t CRC32 = 0;
+	std::error_code CurError;
+	// Regular file sitting on some storage media, unchanging
+	// Use a faster mmap path.
+	if( std::filesystem::is_regular_file(Path, CurError) )
+	{
+		const std::uintmax_t FileSize = std::filesystem::file_size(Path);
+		const auto FileHandle = open(Path.c_str(), O_RDONLY, 0);
+		void* FileMap = mmap(
+			nullptr, FileSize,
+			PROT_READ, MAP_SHARED | MAP_POPULATE, FileHandle, 0
+		);
+		madvise(FileMap, FileSize, MADV_SEQUENTIAL | MADV_WILLNEED);
+		CRC32 = Checksum<0xEDB88320u, const std::uint8_t*>(
+			reinterpret_cast<const std::uint8_t*>(FileMap),
+			reinterpret_cast<const std::uint8_t*>(FileMap) + FileSize
+		);
+		munmap((void*)FileMap, FileSize);
+		close(FileHandle);
+	}
+	else
+	{
+		std::ifstream CurFile(Path, std::ios::binary);
+		CRC32 = Checksum<0xEDB88320u>(
+			std::istreambuf_iterator<char>(CurFile),
+			std::istreambuf_iterator<char>()
+		);
+	}
+
+	return CRC32;
+}
+
+int Check(const Settings& CurSettings)
+{
+	struct CheckEntry
+	{
+		std::filesystem::path FilePath;
+		std::uint32_t Checksum;
+	};
+	std::vector<CheckEntry> CheckList;
+	std::string CurLine;
+	std::ifstream CheckFile(CurSettings.ChecksumFile);
+	if( !CheckFile )
+	{
+		return EXIT_FAILURE;
+	}
+	while( std::getline(CheckFile, CurLine) )
+	{
+		if( CurLine[0] == ';' ) continue;
+		const std::size_t BreakPos = CurLine.find_last_of(' ');
+		const std::string_view CheckString = std::string_view(CurLine).substr(BreakPos + 1);
+		std::uint32_t CheckValue = ~0u;
+		const std::from_chars_result ParseResult = std::from_chars<std::uint32_t>(
+			CheckString.begin(), CheckString.end(), CheckValue, 16
+		);
+		if( ParseResult.ec != std::errc() )
+		{
+			// Error parsing checksum value
+			continue;
+		}
+		CheckList.push_back(
+			{ std::string_view(CurLine).substr(0, BreakPos), CheckValue }
+		);
+	}
+
+	std::vector<std::thread> Workers;
+
+	for( std::size_t i = 0; i < CheckList.size(); ++i )
+	{
+		Workers.push_back(
+			std::thread([&CheckList]
+			(std::size_t Index)
+			{
+				const CheckEntry& CurEntry = CheckList[Index];
+				const bool Valid = CurEntry.Checksum == ChecksumFile(CurEntry.FilePath);
+				std::printf(
+					"%s %08X %s\n",
+					CurEntry.FilePath.c_str(), CurEntry.Checksum,
+					Valid ? "OK":"FAIL"
+				);
+			}, i)
+		);
+	}
+
+	for( std::size_t i = 0; i < CheckList.size(); ++i )
+	{
+		Workers[i].join();
+	}
+	
+
+	return EXIT_SUCCESS;
+}
+
 int main( int argc, char* argv[] )
 {
 	Settings CurSettings = {};
@@ -209,7 +305,8 @@ int main( int argc, char* argv[] )
 		case 'c':
 		{
 			CurSettings.ChecksumFile = std::filesystem::path(optarg);
-			break;
+			//break;
+			return Check(CurSettings);
 		}
 		default:
 		{
@@ -250,34 +347,7 @@ int main( int argc, char* argv[] )
 
 	for( const auto& CurPath : CurSettings.InputFiles )
 	{
-		std::uint32_t CRC32 = 0;
-		std::error_code CurError;
-		// Regular file sitting on some storage media, unchanging
-		// Use a faster mmap path.
-		if( std::filesystem::is_regular_file(CurPath, CurError) )
-		{
-			const std::uintmax_t FileSize = std::filesystem::file_size(CurPath);
-			const auto FileHandle = open(CurPath.c_str(), O_RDONLY, 0);
-			void* FileMap = mmap(
-				nullptr, FileSize,
-				PROT_READ, MAP_SHARED | MAP_POPULATE, FileHandle, 0
-			);
-			madvise(FileMap, FileSize, MADV_SEQUENTIAL | MADV_WILLNEED);
-			CRC32 = Checksum<0xEDB88320u, const std::uint8_t*>(
-				reinterpret_cast<const std::uint8_t*>(FileMap),
-				reinterpret_cast<const std::uint8_t*>(FileMap) + FileSize
-			);
-			munmap((void*)FileMap, FileSize);
-			close(FileHandle);
-		}
-		else
-		{
-			std::ifstream CurFile(CurPath, std::ios::binary);
-			CRC32 = Checksum<0xEDB88320u>(
-				std::istreambuf_iterator<char>(CurFile),
-				std::istreambuf_iterator<char>()
-			);
-		}
+		const std::uint32_t CRC32 = ChecksumFile(CurPath);
 		std::fprintf(stdout, "%s %08X\n", CurPath.filename().c_str(), CRC32);
 	}
 	return EXIT_SUCCESS;
