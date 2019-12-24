@@ -263,7 +263,7 @@ int Check(const Settings& CurSettings)
 						const std::uint32_t CurSum = ChecksumFile(CurEntry.FilePath);
 						const bool Valid = CurEntry.Checksum == CurSum;
 						std::printf(
-							"\e[36m%s\t\e[37m%08X\e[0m...%s%08X\t%s\e[0m\n",
+							"\e[36m%s\t\e[33m%08X\e[37m...%s%08X\t%s\e[0m\n",
 							CurEntry.FilePath.c_str(), CurEntry.Checksum,
 							Valid ? "\e[32m" : "\e[31m", CurSum,
 							Valid ? "\e[32mOK" : "\e[31mFAIL"
@@ -272,7 +272,7 @@ int Check(const Settings& CurSettings)
 					else
 					{
 						std::printf(
-							"\e[36m%s\t\e[37m%08X\t\t\e[31mError opening file\n",
+							"\e[36m%s\t\e[33m%08X\t\t\e[31mError opening file\n",
 							CurEntry.FilePath.c_str(), CurEntry.Checksum
 						);
 					}
