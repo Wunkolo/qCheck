@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <numeric>
 #include <mutex>
+#include <atomic>
 #include <thread>
 
 #include <vector>
@@ -20,7 +21,7 @@
 #include <sys/types.h>
 #include <sys/mman.h>
 #include <fcntl.h>
-
+#include <pthread.h>
 
 #ifdef __AVX2__
 #include <immintrin.h>
@@ -38,7 +39,7 @@ const char* Usage =
 "qCheck - Wunkolo <wunkolo@gmail.com>\n"
 "Usage: qCheck [Options]... [Files]...\n"
 "  -h, --help               Show this help message\n"
-"  -t, --threads            Number of checker threads in parallel. Default: 2\n";
+"  -t, --threads            Number of checker threads in parallel\n";
 
 const static struct option CommandOptions[] = {
 	{ "threads",  optional_argument, nullptr,  't' },
@@ -81,12 +82,10 @@ inline std::uint32_t _mm256_hxor_epi32(__m256i a)
 {
 	// Xor top half with bottom half
 	const __m128i XorReduce128 = _mm_xor_si128(
-		_mm256_extracti128_si256(a, 1),
-		_mm256_extracti128_si256(a, 0)
+		_mm256_extracti128_si256(a, 1), _mm256_extracti128_si256(a, 0)
 	);
 	const std::uint64_t XorReduce64 =
-		_mm_extract_epi64(XorReduce128, 1) ^
-		_mm_extract_epi64(XorReduce128, 0);
+		_mm_extract_epi64(XorReduce128, 1) ^ _mm_extract_epi64(XorReduce128, 0);
 	return XorReduce64 ^ (XorReduce64 >> 32);
 }
 #endif
@@ -149,8 +148,7 @@ std::uint32_t Checksum(RandomIterator First, RandomIterator Last, std::random_ac
 #endif
 
 	First += (i * 8);
-	return ~std::accumulate(
-		First, Last, CRC,
+	return ~std::accumulate( First, Last, CRC,
 		[](std::uint32_t CRC, std::uint8_t Byte) 
 		{
 			return (CRC >> 8) ^ Table[0][std::uint8_t(CRC) ^ Byte];
@@ -162,8 +160,7 @@ template< typename Iterator, std::uint32_t Polynomial >
 std::uint32_t Checksum(Iterator First, Iterator Last, std::input_iterator_tag)
 {
 	static constexpr auto Table = CRC32Table(Polynomial);
-	return ~std::accumulate(
-		First, Last, ~std::uint32_t(0),
+	return ~std::accumulate( First, Last, ~std::uint32_t(0),
 		[](std::uint32_t CRC, std::uint8_t Byte) 
 		{
 			return (CRC >> 8) ^ Table[0][std::uint8_t(CRC) ^ Byte];
@@ -174,8 +171,7 @@ std::uint32_t Checksum(Iterator First, Iterator Last, std::input_iterator_tag)
 template< std::uint32_t Polynomial, typename Iterator>
 inline std::uint32_t Checksum(Iterator First, Iterator Last)
 {
-	return Checksum<Iterator, Polynomial>(
-		First, Last,
+	return Checksum<Iterator, Polynomial>( First, Last,
 		typename std::iterator_traits<Iterator>::iterator_category()
 	);
 }
@@ -190,8 +186,7 @@ std::uint32_t ChecksumFile( const std::filesystem::path& Path )
 	{
 		const std::uintmax_t FileSize = std::filesystem::file_size(Path);
 		const auto FileHandle = open(Path.c_str(), O_RDONLY, 0);
-		void* FileMap = mmap(
-			nullptr, FileSize,
+		void* FileMap = mmap( nullptr, FileSize,
 			PROT_READ, MAP_SHARED | MAP_POPULATE, FileHandle, 0
 		);
 		madvise(FileMap, FileSize, MADV_SEQUENTIAL | MADV_WILLNEED);
@@ -221,14 +216,11 @@ int Check(const Settings& CurSettings)
 		std::filesystem::path FilePath;
 		std::uint32_t Checksum;
 	};
-	std::mutex QueueLock;
-	std::queue<CheckEntry> Checkqueue;
+	std::atomic<std::size_t> QueueLock;
+	std::vector<CheckEntry> Checkqueue;
 	std::string CurLine;
 	std::ifstream CheckFile(CurSettings.ChecksumFile);
-	if( !CheckFile )
-	{
-		return EXIT_FAILURE;
-	}
+	if( !CheckFile ) return EXIT_FAILURE;
 	while( std::getline(CheckFile, CurLine) )
 	{
 		if( CurLine[0] == ';' ) continue;
@@ -243,7 +235,7 @@ int Check(const Settings& CurSettings)
 			// Error parsing checksum value
 			continue;
 		}
-		Checkqueue.push(
+		Checkqueue.push_back(
 			{ std::string_view(CurLine).substr(0, BreakPos), CheckValue }
 		);
 	}
@@ -252,25 +244,26 @@ int Check(const Settings& CurSettings)
 
 	for( std::size_t i = 0; i < CurSettings.Threads; ++i )
 	{
-		Workers.push_back(
-			std::thread([&QueueLock, &Checkqueue]
+		Workers.push_back( std::thread(
+			[&QueueLock, &Checkqueue = std::as_const(Checkqueue)]
 			(std::size_t Index)
 			{
+				pthread_setname_np( pthread_self(),
+					("qCheck-Worker: " + std::to_string(Index)).c_str()
+				);
 				while( true )
 				{
-					CheckEntry CurEntry{};
-					{
-						std::unique_lock<std::mutex> lock(QueueLock);
-						if(Checkqueue.empty()) return;
-						CurEntry = Checkqueue.front();
-						Checkqueue.pop();
-					}
+					const std::size_t EntryIndex = std::atomic_fetch_add(
+						&QueueLock, 1
+					);
+					if( EntryIndex >= Checkqueue.size()) return;
+					const CheckEntry& CurEntry = Checkqueue[EntryIndex];
 					if( std::filesystem::is_regular_file(CurEntry.FilePath) )
 					{
 						const std::uint32_t CurSum = ChecksumFile(CurEntry.FilePath);
 						const bool Valid = CurEntry.Checksum == CurSum;
 						std::printf(
-							"\e[36m%s\t\e[37m%08X\e[0m==%s%08X\t%s\e[0m\n",
+							"\e[36m%s\t\e[37m%08X\e[0m...%s%08X\t%s\e[0m\n",
 							CurEntry.FilePath.c_str(), CurEntry.Checksum,
 							Valid ? "\e[32m" : "\e[31m", CurSum,
 							Valid ? "\e[32mOK" : "\e[31mFAIL"
@@ -288,11 +281,7 @@ int Check(const Settings& CurSettings)
 		);
 	}
 
-	for( std::size_t i = 0; i < CurSettings.Threads; ++i )
-	{
-		Workers[i].join();
-	}
-	
+	for( std::size_t i = 0; i < CurSettings.Threads; ++i ) Workers[i].join();
 
 	return EXIT_SUCCESS;
 }
@@ -302,6 +291,9 @@ int main( int argc, char* argv[] )
 	Settings CurSettings = {};
 	int Opt;
 	int OptionIndex;
+	CurSettings.Threads = std::max<std::size_t>(
+		std::thread::hardware_concurrency() / 4, CurSettings.Threads
+	);
 	// Parse Arguments
 	while( (Opt = getopt_long(argc, argv, "c:t:h", CommandOptions, &OptionIndex )) != -1 )
 	{
