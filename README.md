@@ -2,9 +2,21 @@
 
 **Work in progress**
 
-A **q**uick alternative to cksfv for generating and verifying CRC32C checksum files.
+A **q**uick alternative to cksfv for generating and verifying CRC32C checksum files(`.sfv`).
 
 ---
+
+qCheck accelerates the checksum and checksum-verification process by interfacing
+with the `.sfv` file format and using a more modern approach by utilizing both
+multi-threaded parallelism and memory-mapped IO to reduce syscall overhead.
+
+qCheck has proven itself to be about **x4** to **x15** times faster than
+alternatives such as `rhash` and `cksfv` and reduces CRC32's algorithmic
+overhead to the point of being almost entirely by device IO.
+
+---
+
+Specs:
 ```
 % inxi -IC
 CPU:       Topology: 10-Core model: Intel Core i9-7900X bits: 64 type: MT MCP L2 cache: 13.8 MiB 
@@ -12,6 +24,15 @@ CPU:       Topology: 10-Core model: Intel Core i9-7900X bits: 64 type: MT MCP L2
            8: 1201 9: 1201 10: 1201 11: 1201 12: 1201 13: 1201 14: 1201 15: 1200 16: 1201 17: 1200 18: 1200 19: 1200 20: 1200 
 Info:      Processes: 350 Uptime: 9d 14h 45m Memory: 62.51 GiB used: 19.88 GiB (31.8%) Init: systemd Shell: vim inxi: 3.0.37 
 
+% sudo nvme list
+Node             SN                   Model                                    Namespace Usage                      Format           FW Rev  
+---------------- -------------------- ---------------------------------------- --------- -------------------------- ---------------- --------
+<snip>
+/dev/nvme1n1     S~~~N~~~9~~~7~~      Samsung SSD 970 EVO 500GB                1         341.05  GB / 500.11  GB    512   B +  0 B   2B2QEXE7
+```
+
+Verifying an .sfv file(10GB folder full of +200MB files)
+```
 % hyperfine --runs 10 -i '../qCheck -c TestCheck.sfv' 'rhash -c TestCheck.sfv' 'cksfv -g TestCheck.sfv'
 Benchmark #1: ../qCheck -c TestCheck.sfv
   Time (mean ± σ):      1.494 s ±  0.198 s    [User: 5.140 s, System: 0.817 s]
@@ -27,4 +48,25 @@ Summary
   '../qCheck -c TestCheck.sfv' ran
     4.94 ± 0.65 times faster than 'rhash -c TestCheck.sfv'
    14.31 ± 1.94 times faster than 'cksfv -g TestCheck.sfv'
+```
+
+Generating a .sfv file(10GB folder full of +200MB files)
+```
+% hyperfine --runs 10 "rhash SampleFiles/*" "./qCheck SampleFiles/*" "cksfv SampleFiles/*"
+Benchmark #1: rhash SampleFiles/*
+  Time (mean ± σ):      6.234 s ±  0.145 s    [User: 4.798 s, System: 1.424 s]
+  Range (min … max):    6.133 s …  6.632 s    10 runs
+
+Benchmark #2: ./qCheck SampleFiles/*
+  Time (mean ± σ):      1.435 s ±  0.105 s    [User: 5.146 s, System: 0.610 s]
+  Range (min … max):    1.289 s …  1.590 s    10 runs
+
+Benchmark #3: cksfv SampleFiles/*
+  Time (mean ± σ):     20.896 s ±  0.074 s    [User: 19.611 s, System: 1.271 s]
+  Range (min … max):   20.778 s … 20.996 s    10 runs
+
+Summary
+  './qCheck SampleFiles/*' ran
+    4.34 ± 0.33 times faster than 'rhash SampleFiles/*'
+   14.56 ± 1.07 times faster than 'cksfv SampleFiles/*'
 ```
