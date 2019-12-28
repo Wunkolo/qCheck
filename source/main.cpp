@@ -362,10 +362,31 @@ int main( int argc, char* argv[] )
 		}
 	}
 
-	for( const auto& CurPath : CurSettings.InputFiles )
+	std::atomic<std::size_t> FileIndex(0);
+	std::vector<std::thread> Workers;
+	for( std::size_t i = 0; i < CurSettings.Threads; ++i )
 	{
-		const std::uint32_t CRC32 = ChecksumFile(CurPath);
-		std::fprintf(stdout, "%s %08X\n", CurPath.filename().c_str(), CRC32);
+		Workers.push_back( std::thread(
+			[&FileIndex, &FileList = std::as_const(CurSettings.InputFiles)]
+			(std::size_t WorkerIndex)
+			{
+				pthread_setname_np( pthread_self(),
+					("qCheck-Worker: " + std::to_string(WorkerIndex)).c_str()
+				);
+				while( true )
+				{
+					const std::size_t EntryIndex = std::atomic_fetch_add(
+						&FileIndex, 1
+					);
+					if( FileIndex >= FileList.size()) return;
+					const std::filesystem::path& CurPath = FileList[EntryIndex];
+					const std::uint32_t CRC32 = ChecksumFile(CurPath);
+					std::fprintf(stdout, "%s %08X\n", CurPath.filename().c_str(), CRC32);
+				}
+			}, i)
+		);
 	}
+	for( std::size_t i = 0; i < CurSettings.Threads; ++i ) Workers[i].join();
+
 	return EXIT_SUCCESS;
 }
