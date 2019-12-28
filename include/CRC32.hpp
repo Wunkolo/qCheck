@@ -9,7 +9,16 @@
 
 namespace CRC
 {
-	
+
+enum class Polynomial : std::uint32_t
+{
+	CRC32   = 0xEDB88320,
+	CRC32C  = 0x82F63B78,
+	CRC32K  = 0xEB31D82E,
+	CRC32K2 = 0x992C1A4C,
+	CRC32Q  = 0xD5828281,
+};
+
 constexpr std::array<std::array<std::uint32_t, 256>, 8> CRC32Table(
 	std::uint32_t Polynomial
 ) noexcept
