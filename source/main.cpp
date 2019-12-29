@@ -106,7 +106,10 @@ int Check(const Settings& CurSettings)
 			continue;
 		}
 		Checkqueue.push_back(
-			{ std::string_view(CurLine).substr(0, BreakPos), CheckValue }
+			{
+				CurSettings.ChecksumFile.parent_path() / std::string_view(CurLine).substr(0, BreakPos),
+				CheckValue
+			}
 		);
 	}
 
