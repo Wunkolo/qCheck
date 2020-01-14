@@ -19,6 +19,7 @@
 #include <getopt.h>
 #include <unistd.h>
 #include <sys/types.h>
+#include <sys/stat.h>
 #include <sys/mman.h>
 #include <fcntl.h>
 #include <sched.h>
@@ -239,8 +240,24 @@ int main( int argc, char* argv[] )
 		if( std::filesystem::is_regular_file(CurPath, CurError) )
 		{
 			FileSize = std::filesystem::file_size(CurPath);
+
+			char TimeString[64] = {0};
+			struct stat FileStat = {};
+			if( stat(CurPath.c_str(), &FileStat) == 0 )
+			{
+				time_t FileTime = {};
+				FileTime = FileStat.st_mtime;
+				std::strftime(
+					TimeString, std::extent_v<decltype(TimeString)>,
+					"%F %T %Z", std::localtime(&FileTime)
+				);
+			}
 			CurSettings.InputFiles.emplace_back(CurPath);
-			std::fprintf(stdout, "; %zu %s\n", FileSize, CurPath.filename().c_str());
+			std::fprintf(
+				stdout, "; %.64s %zu %s\n",
+				TimeString, FileSize,
+				CurPath.filename().c_str()
+			);
 		}
 	}
 
