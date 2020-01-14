@@ -21,6 +21,7 @@
 #include <sys/types.h>
 #include <sys/mman.h>
 #include <fcntl.h>
+#include <sched.h>
 #include <pthread.h>
 
 #include "CRC32.hpp"
@@ -37,7 +38,8 @@ const char* Usage =
 "qCheck - Wunkolo <wunkolo@gmail.com>\n"
 "Usage: qCheck [Options]... [Files]...\n"
 "  -h, --help               Show this help message\n"
-"  -t, --threads            Number of checker threads in parallel\n";
+"  -t, --threads            Number of checker threads in parallel\n"
+"  -c, --check              Verify an .sfv file\n";
 
 const static struct option CommandOptions[] = {
 	{ "threads",  optional_argument, nullptr,  't' },
@@ -119,11 +121,13 @@ int Check(const Settings& CurSettings)
 	{
 		Workers.push_back( std::thread(
 			[&QueueLock, &Checkqueue = std::as_const(Checkqueue)]
-			(std::size_t Index)
+			(std::size_t WorkerIndex)
 			{
-				pthread_setname_np( pthread_self(),
-					("qCheck-Worker: " + std::to_string(Index)).c_str()
-				);
+			#ifdef _POSIX_VERSION
+				char ThreadName[16] = {0};
+				std::sprintf(ThreadName, "qCheckWkr: %4zu", WorkerIndex);
+				pthread_setname_np(pthread_self(), ThreadName);
+			#endif
 				while( true )
 				{
 					const std::size_t EntryIndex = std::atomic_fetch_add(
@@ -167,6 +171,11 @@ int main( int argc, char* argv[] )
 	CurSettings.Threads = std::max<std::size_t>(
 		std::thread::hardware_concurrency() / 4, CurSettings.Threads
 	);
+	if( argc <= 1 )
+	{
+		std::puts(Usage);
+		return EXIT_SUCCESS;
+	}
 	// Parse Arguments
 	while( (Opt = getopt_long(argc, argv, "c:t:h", CommandOptions, &OptionIndex )) != -1 )
 	{
@@ -243,9 +252,11 @@ int main( int argc, char* argv[] )
 			[&FileIndex, &FileList = std::as_const(CurSettings.InputFiles)]
 			(std::size_t WorkerIndex)
 			{
-				pthread_setname_np( pthread_self(),
-					("qCheck-Worker: " + std::to_string(WorkerIndex)).c_str()
-				);
+			#ifdef _POSIX_VERSION
+				char ThreadName[16] = {0};
+				std::sprintf(ThreadName, "qCheckWkr: %4zu", WorkerIndex);
+				pthread_setname_np(pthread_self(), ThreadName);
+			#endif
 				while( true )
 				{
 					const std::size_t EntryIndex = std::atomic_fetch_add(
