@@ -19,11 +19,18 @@ enum class Polynomial : std::uint32_t
 	CRC32Q  = 0xD5828281,
 };
 
+// TODO: This is pretty big, about 16kb total, which is almost
+// half of most processor's data cache(32kb)
+// If we use a LUT-less carryless multiply instruction, then the cache can
+// be much more properly populated with actual IO data rather than our LUT
+// https://www.intel.com/content/dam/www/public/us/en/documents/white-papers/fast-crc-computation-generic-polynomials-pclmulqdq-paper.pdf
+// - Tue 30 Jun 2020 12:04:40 PM PDT
 constexpr std::array<std::array<std::uint32_t, 256>, 16> CRC32Table(
 	std::uint32_t Polynomial
 ) noexcept
 {
 	std::array<std::array<std::uint32_t, 256>, 16> Table = {};
+	// Generate main table
 	for( std::size_t i = 0; i < 256; ++i )
 	{
 		std::uint32_t CRC = i;
@@ -33,7 +40,7 @@ constexpr std::array<std::array<std::uint32_t, 256>, 16> CRC32Table(
 		}
 		Table[0][i] = CRC;
 	}
-
+	// Generate additional tables based on the main table
 	for( std::size_t i = 0; i < 256; ++i )
 	{
 		Table[ 1][i] = (Table[ 0][i] >> 8) ^ Table[0][std::uint8_t(Table[ 0][i])];
@@ -118,8 +125,7 @@ std::uint32_t Checksum(RandomIterator First, RandomIterator Last, std::random_ac
 		// Spread out each byte into a eight 32-bit lanes, in each 256-bit lane
 		const __m512i Indices = _mm512_shuffle_epi8(
 			_mm512_unpacklo_epi64(
-				_mm512_set1_epi64(Input64Lo),
-				_mm512_set1_epi64(Input64Hi)
+				_mm512_set1_epi64(Input64Lo), _mm512_set1_epi64(Input64Hi)
 			), ByteIndex
 		);
 		// Use the spread out bytes to gather 
@@ -130,7 +136,7 @@ std::uint32_t Checksum(RandomIterator First, RandomIterator Last, std::random_ac
 		);
 		CRC = _mm256_hxor_epi32(
 			_mm256_xor_si256(
-				_mm512_extracti32x8_epi32(Gather,0),
+				_mm512_castsi512_si256(Gather),
 				_mm512_extracti32x8_epi32(Gather,1)
 			)
 		);
