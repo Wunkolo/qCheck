@@ -53,7 +53,7 @@ inline std::uint32_t _mm256_hxor_epi32(__m256i a)
 {
 	// Xor top half with bottom half
 	const __m128i XorReduce128 = _mm_xor_si128(
-		_mm256_extracti128_si256(a, 1), _mm256_extracti128_si256(a, 0)
+		_mm256_extracti128_si256(a, 1), _mm256_castsi256_si128(a)
 	);
 	const std::uint64_t XorReduce64 =
 		_mm_extract_epi64(XorReduce128, 1) ^ _mm_extract_epi64(XorReduce128, 0);
@@ -69,7 +69,7 @@ std::uint32_t Checksum(RandomIterator First, RandomIterator Last, std::random_ac
 	std::uint32_t CRC = ~0;
 	const std::size_t Size = static_cast<std::size_t>(std::distance(First, Last));
 	const std::uint32_t* Input32 = reinterpret_cast<const std::uint32_t*>(&(*First));
-	std::size_t i;
+	std::size_t i = 0;
 
 	// Slice by 8
 #ifdef __AVX2__
@@ -87,7 +87,7 @@ std::uint32_t Checksum(RandomIterator First, RandomIterator Last, std::random_ac
 		(sizeof(typename decltype(Table)::value_type) / 4) * 6,
 		(sizeof(typename decltype(Table)::value_type) / 4) * 7 
 	);
-	for( i = 0; i < Size / 8; ++i )
+	for( ; i < Size / 8; ++i )
 	{
 		const std::uint64_t Input64 =
 			*reinterpret_cast<const std::uint64_t*>(Input32) ^ CRC;
@@ -102,7 +102,7 @@ std::uint32_t Checksum(RandomIterator First, RandomIterator Last, std::random_ac
 		CRC = _mm256_hxor_epi32(Gather);
 	}
 #else
-	for( i = 0; i < Size / 8; ++i )
+	for( ; i < Size / 8; ++i )
 	{
 		const std::uint32_t InputLo = *Input32++ ^ CRC;
 		const std::uint32_t InputHi = *Input32++;
