@@ -282,7 +282,15 @@ int main( int argc, char* argv[] )
 					if( FileIndex >= FileList.size()) return;
 					const std::filesystem::path& CurPath = FileList[EntryIndex];
 					const std::uint32_t CRC32 = ChecksumFile(CurPath);
-					std::fprintf(stdout, "%s %08X\n", CurPath.filename().c_str(), CRC32);
+					// If writing to a terminal, put some pretty colored output
+					if( isatty(fileno(stdout)) )
+					{
+						std::fprintf(stdout, "\e[36m%s\t\e[33m%08X\e[0m\n", CurPath.filename().c_str(), CRC32);
+					}
+					else
+					{
+						std::fprintf(stdout, "%s %08X\n", CurPath.filename().c_str(), CRC32);
+					}
 				}
 			}, i)
 		);
