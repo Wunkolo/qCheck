@@ -12,9 +12,13 @@ multi-threaded parallelism and memory-mapped IO to reduce syscall overhead.
 
 qCheck has proven itself to be about **x4** to **x15** times faster than
 alternatives such as `rhash` and `cksfv` and reduces CRC32's algorithmic
-overhead to the point of being almost entirely by device IO.
+overhead to the point of being almost entirely bounded by device IO speeds.
+It is recommended to run this program on a fast NVME Solid State Drive to fully
+saturate read speed.
 
 ---
+
+## Benchmark
 
 Specs:
 ```
