@@ -3,8 +3,81 @@
 #include <cstddef>
 #include <array>
 
-#ifdef __AVX2__
-#include <immintrin.h>
+#ifdef __x86_64__
+#include <x86intrin.h>
+#endif
+
+#ifdef __PCLMUL__
+constexpr std::uint32_t BitReverse32(std::uint32_t n)
+{
+	std::uint32_t Reversed = 0;
+	for( std::uint32_t i = 0u; i < 32u; ++i )
+	{
+		Reversed = (Reversed << 1u) + (n & 0b1);
+		n >>= 1u;
+	}
+	return Reversed;
+}
+
+// BitReverse(x^(shift) mod P(x) << 32) << 1
+constexpr std::uint64_t KnConstant(std::uint32_t ByteShift, std::uint32_t poly)
+{
+	std::uint32_t remainder = 1u << 24;
+	for(std::size_t i = 5; i <= (ByteShift + 1); ++i )
+	{
+		for( std::int8_t b = 0; b < 8; ++b )
+		{
+			// Remainder is about to overflow, increment quotient
+			if( remainder >> 31u)
+			{
+				remainder <<= 1u;   // r *= x
+				remainder  ^= poly; // r += poly
+			}
+			else
+			{
+				remainder <<= 1u;   // r *= 2
+			}
+		}
+	}
+	return static_cast<std::uint64_t>(BitReverse32(remainder)) << 1;
+}
+
+// BitReverse(x^64 / P(x)) << 1
+constexpr std::uint64_t MuConstant(uint32_t poly)
+{
+	std::uint32_t remainder = 1u << 24;
+	std::uint32_t quotient = 0u;
+	for( std::size_t i = 5; i <= 9; ++i )
+	{
+		for( std::int8_t b = 0; b < 8; ++b )
+		{
+			quotient <<= 1u; // q *= x
+			// Remainder is about to overflow, increment quotient
+			if( remainder >> 31u )
+			{
+				remainder <<= 1u;   // r *= x
+				remainder  ^= poly; // + poly
+				quotient   |= 1u;   // + x^0
+			}
+			else
+			{
+				remainder <<= 1u;   // r *= 2
+			}
+		}
+	}
+	return (static_cast<std::uint64_t>(BitReverse32(quotient)) << 1u) | 1;
+}
+
+#define POLY 0x1EDC6F41
+#define IEEEPOLY 0x04C11DB7
+
+static_assert(KnConstant(  64 + 4, IEEEPOLY) == 0x154442BD4);
+static_assert(KnConstant(  64 - 4, IEEEPOLY) == 0x1C6E41596);
+static_assert(KnConstant(  16 + 4, IEEEPOLY) == 0x1751997D0);
+static_assert(KnConstant(  16 - 4, IEEEPOLY) == 0x0ccaa009e);
+static_assert(KnConstant(       8, IEEEPOLY) == 0x163cd6124);
+static_assert(KnConstant(       4, IEEEPOLY) == 0x1db710640);
+static_assert(MuConstant(          IEEEPOLY) == 0x1F7011641);
 #endif
 
 namespace CRC
