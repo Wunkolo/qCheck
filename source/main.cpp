@@ -128,8 +128,7 @@ int Check(const Settings& CurSettings)
 #endif
 				while( true )
 				{
-					const std::size_t EntryIndex
-						= std::atomic_fetch_add(&QueueLock, 1);
+					const std::size_t EntryIndex = QueueLock.fetch_add(1);
 					if( EntryIndex >= Checkqueue.size() )
 						return;
 					const CheckEntry& CurEntry = Checkqueue[EntryIndex];
