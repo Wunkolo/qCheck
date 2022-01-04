@@ -168,7 +168,8 @@ int main(int argc, char* argv[])
 	int      Opt;
 	int      OptionIndex;
 	CurSettings.Threads = std::max<std::size_t>(
-		std::thread::hardware_concurrency() / 4, CurSettings.Threads);
+		{std::thread::hardware_concurrency() / 4, CurSettings.Threads, 1});
+
 	if( argc <= 1 )
 	{
 		std::puts(Usage);
