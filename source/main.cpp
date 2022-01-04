@@ -268,9 +268,8 @@ int main(int argc, char* argv[])
 #endif
 				while( true )
 				{
-					const std::size_t EntryIndex
-						= std::atomic_fetch_add(&FileIndex, 1);
-					if( FileIndex >= FileList.size() )
+					const std::size_t EntryIndex = FileIndex.fetch_add(1);
+					if( EntryIndex >= FileList.size() )
 						return;
 					const std::filesystem::path& CurPath = FileList[EntryIndex];
 					const std::uint32_t          CRC32 = ChecksumFile(CurPath);
