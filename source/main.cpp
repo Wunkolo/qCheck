@@ -196,9 +196,8 @@ int main(int argc, char* argv[])
 		return EXIT_SUCCESS;
 	}
 	// Parse Arguments
-	while(
-		(Opt = getopt_long(argc, argv, "t:c:h", CommandOptions, &OptionIndex))
-		!= -1 )
+	while( (Opt = getopt_long(argc, argv, "t:ch", CommandOptions, &OptionIndex))
+		   != -1 )
 	{
 		switch( Opt )
 		{
