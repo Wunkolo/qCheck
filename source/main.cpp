@@ -38,14 +38,14 @@ struct Settings
 const char* Usage
 	= "qCheck - Wunkolo <wunkolo@gmail.com>\n"
 	  "Usage: qCheck [Options]... [Files]...\n"
-	  "  -h, --help               Show this help message\n"
 	  "  -t, --threads            Number of checker threads in parallel\n"
-	  "  -c, --check              Verify an .sfv file\n";
+	  "  -c, --check              Verify an .sfv file\n"
+	  "  -h, --help               Show this help message\n";
 
 const static struct option CommandOptions[]
 	= {{"threads", optional_argument, nullptr, 't'},
-	   {"help", optional_argument, nullptr, 'h'},
 	   {"check", optional_argument, nullptr, 'c'},
+	   {"help", no_argument, nullptr, 'h'},
 	   {nullptr, no_argument, nullptr, '\0'}};
 
 std::uint32_t ChecksumFile(const std::filesystem::path& Path)
@@ -177,7 +177,7 @@ int main(int argc, char* argv[])
 	}
 	// Parse Arguments
 	while(
-		(Opt = getopt_long(argc, argv, "c:t:h", CommandOptions, &OptionIndex))
+		(Opt = getopt_long(argc, argv, "t:c:h", CommandOptions, &OptionIndex))
 		!= -1 )
 	{
 		switch( Opt )
