@@ -43,8 +43,8 @@ const char* Usage
 	  "  -h, --help               Show this help message\n";
 
 const static struct option CommandOptions[]
-	= {{"threads", optional_argument, nullptr, 't'},
-	   {"check", optional_argument, nullptr, 'c'},
+	= {{"threads", required_argument, nullptr, 't'},
+	   {"check", required_argument, nullptr, 'c'},
 	   {"help", no_argument, nullptr, 'h'},
 	   {nullptr, no_argument, nullptr, '\0'}};
 
