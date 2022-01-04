@@ -195,16 +195,12 @@ int main(int argc, char* argv[])
 			CurSettings.Threads = static_cast<std::size_t>(Threads);
 			break;
 		}
-		case 'h':
-		{
-			std::puts(Usage);
-			return EXIT_SUCCESS;
-		}
 		case 'c':
 		{
 			CurSettings.ChecksumFile = std::filesystem::path(optarg);
 			break;
 		}
+		case 'h':
 		default:
 		{
 			std::puts(Usage);
