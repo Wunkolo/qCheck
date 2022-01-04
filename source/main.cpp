@@ -221,14 +221,6 @@ int main(int argc, char* argv[])
 
 	// Check for config errors here
 
-	if( !CurSettings.ChecksumFile.empty() )
-		return Check(CurSettings);
-
-	// Parse file list
-	std::fprintf(
-		stdout,
-		"; Generated with qCheck by Wunkolo [ Build: " __TIMESTAMP__ " ]\n");
-
 	for( std::intmax_t i = 0; i < argc; ++i )
 	{
 		const std::filesystem::path CurPath(argv[i]);
@@ -238,28 +230,44 @@ int main(int argc, char* argv[])
 			continue;
 		}
 		std::error_code CurError;
-		std::size_t     FileSize = 0;
 		// Regular files only, for now, other files will be specially handled
 		// later
 		if( std::filesystem::is_regular_file(CurPath, CurError) )
 		{
-			FileSize = std::filesystem::file_size(CurPath);
-
-			char        TimeString[64] = {0};
-			struct stat FileStat       = {};
-			if( stat(CurPath.c_str(), &FileStat) == 0 )
-			{
-				time_t FileTime = {};
-				FileTime        = FileStat.st_mtime;
-				std::strftime(
-					TimeString, std::extent_v<decltype(TimeString)>, "%F %T %Z",
-					std::localtime(&FileTime));
-			}
 			CurSettings.InputFiles.emplace_back(CurPath);
-			std::fprintf(
-				stdout, "; %.64s %zu %s\n", TimeString, FileSize,
-				CurPath.filename().c_str());
 		}
+		else
+		{
+			std::fprintf(stderr, "Error opening file: %s\n", argv[i]);
+		}
+	}
+
+	if( !CurSettings.ChecksumFile.empty() )
+		return Check(CurSettings);
+
+	// Parse file list
+	std::fprintf(
+		stdout,
+		"; Generated with qCheck by Wunkolo [ Build: " __TIMESTAMP__ " ]\n");
+
+	for( const auto& CurPath : CurSettings.InputFiles )
+	{
+		std::error_code CurError;
+		std::size_t     FileSize = std::filesystem::file_size(CurPath);
+
+		char        TimeString[64] = {0};
+		struct stat FileStat       = {};
+		if( stat(CurPath.c_str(), &FileStat) == 0 )
+		{
+			time_t FileTime = {};
+			FileTime        = FileStat.st_mtime;
+			std::strftime(
+				TimeString, std::extent_v<decltype(TimeString)>, "%F %T %Z",
+				std::localtime(&FileTime));
+		}
+		std::fprintf(
+			stdout, "; %.64s %zu %s\n", TimeString, FileSize,
+			CurPath.filename().c_str());
 	}
 
 	std::atomic<std::size_t> FileIndex(0);
