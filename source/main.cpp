@@ -97,6 +97,8 @@ int Check(const Settings& CurSettings)
 		if( CurLine[0] == ';' )
 			continue;
 		const std::size_t      BreakPos = CurLine.find_last_of(' ');
+		const std::string_view PathString
+			= std::string_view(CurLine).substr(0, BreakPos);
 		const std::string_view CheckString
 			= std::string_view(CurLine).substr(BreakPos + 1);
 		std::uint32_t                CheckValue = ~0u;
@@ -108,10 +110,17 @@ int Check(const Settings& CurSettings)
 			// Error parsing checksum value
 			continue;
 		}
-		Checkqueue.push_back(
-			{CurSettings.ChecksumFile.parent_path()
-				 / std::string_view(CurLine).substr(0, BreakPos),
-			 CheckValue});
+		std::filesystem::path FilePath;
+		if( CurSettings.ChecksumFile.has_parent_path() )
+		{
+			FilePath = CurSettings.ChecksumFile.parent_path();
+		}
+		else
+		{
+			FilePath = ".";
+		}
+		FilePath /= PathString;
+		Checkqueue.push_back({FilePath, CheckValue});
 	}
 
 	std::vector<std::thread> Workers;
