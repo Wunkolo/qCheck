@@ -29,22 +29,22 @@
 
 struct Settings
 {
-	std::filesystem::path              ChecksumFile;
 	std::vector<std::filesystem::path> InputFiles;
 	std::size_t                        Threads = 2;
 	bool                               Verbose = true;
+	bool                               Check   = false;
 };
 
 const char* Usage
 	= "qCheck - Wunkolo <wunkolo@gmail.com>\n"
 	  "Usage: qCheck [Options]... [Files]...\n"
 	  "  -t, --threads            Number of checker threads in parallel\n"
-	  "  -c, --check              Verify an .sfv file\n"
+	  "  -c, --check              Verify all input as .sfv files\n"
 	  "  -h, --help               Show this help message\n";
 
 const static struct option CommandOptions[]
 	= {{"threads", required_argument, nullptr, 't'},
-	   {"check", required_argument, nullptr, 'c'},
+	   {"check", no_argument, nullptr, 'c'},
 	   {"help", no_argument, nullptr, 'h'},
 	   {nullptr, no_argument, nullptr, '\0'}};
 
@@ -86,41 +86,53 @@ int Check(const Settings& CurSettings)
 		std::filesystem::path FilePath;
 		std::uint32_t         Checksum;
 	};
-	std::atomic<std::size_t> QueueLock;
+	std::atomic<std::size_t> QueueLock{0};
 	std::vector<CheckEntry>  Checkqueue;
-	std::string              CurLine;
-	std::ifstream            CheckFile(CurSettings.ChecksumFile);
-	if( !CheckFile )
-		return EXIT_FAILURE;
-	while( std::getline(CheckFile, CurLine) )
+
+	// Queue up all files to be checked
+
+	std::string CurLine;
+	for( const auto& CurSfvPath : CurSettings.InputFiles )
 	{
-		if( CurLine[0] == ';' )
-			continue;
-		const std::size_t      BreakPos = CurLine.find_last_of(' ');
-		const std::string_view PathString
-			= std::string_view(CurLine).substr(0, BreakPos);
-		const std::string_view CheckString
-			= std::string_view(CurLine).substr(BreakPos + 1);
-		std::uint32_t                CheckValue = ~0u;
-		const std::from_chars_result ParseResult
-			= std::from_chars<std::uint32_t>(
-				CheckString.begin(), CheckString.end(), CheckValue, 16);
-		if( ParseResult.ec != std::errc() )
+		std::ifstream CheckFile(CurSfvPath);
+		if( !CheckFile )
 		{
-			// Error parsing checksum value
-			continue;
+			std::fprintf(
+				stdout, "Failed to open \"%s\" for reading\n",
+				CurSfvPath.u8string().c_str());
+			return EXIT_FAILURE;
 		}
-		std::filesystem::path FilePath;
-		if( CurSettings.ChecksumFile.has_parent_path() )
+
+		while( std::getline(CheckFile, CurLine) )
 		{
-			FilePath = CurSettings.ChecksumFile.parent_path();
+			if( CurLine[0] == ';' )
+				continue;
+			const std::size_t      BreakPos = CurLine.find_last_of(' ');
+			const std::string_view PathString
+				= std::string_view(CurLine).substr(0, BreakPos);
+			const std::string_view CheckString
+				= std::string_view(CurLine).substr(BreakPos + 1);
+			std::uint32_t                CheckValue = ~0u;
+			const std::from_chars_result ParseResult
+				= std::from_chars<std::uint32_t>(
+					CheckString.begin(), CheckString.end(), CheckValue, 16);
+			if( ParseResult.ec != std::errc() )
+			{
+				// Error parsing checksum value
+				continue;
+			}
+			std::filesystem::path FilePath;
+			if( CurSfvPath.has_parent_path() )
+			{
+				FilePath = CurSfvPath.parent_path();
+			}
+			else
+			{
+				FilePath = ".";
+			}
+			FilePath /= PathString;
+			Checkqueue.push_back({FilePath, CheckValue});
 		}
-		else
-		{
-			FilePath = ".";
-		}
-		FilePath /= PathString;
-		Checkqueue.push_back({FilePath, CheckValue});
 	}
 
 	std::vector<std::thread> Workers;
@@ -205,7 +217,7 @@ int main(int argc, char* argv[])
 		}
 		case 'c':
 		{
-			CurSettings.ChecksumFile = std::filesystem::path(optarg);
+			CurSettings.Check = true;
 			break;
 		}
 		case 'h':
@@ -242,7 +254,7 @@ int main(int argc, char* argv[])
 		}
 	}
 
-	if( !CurSettings.ChecksumFile.empty() )
+	if( CurSettings.Check )
 		return Check(CurSettings);
 
 	// Parse file list
