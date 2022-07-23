@@ -232,9 +232,9 @@ std::uint32_t Checksum(std::span<const std::byte> Data)
 
 	return ~std::accumulate(
 		Data.begin(), Data.end(), CRC,
-		[](std::uint32_t CRC, std::byte Byte) -> std::uint32_t {
-			return (CRC >> 8)
-				 ^ Table[0][std::uint8_t(CRC) ^ std::uint8_t(Byte)];
+		[](std::uint32_t CurCRC, std::byte Byte) -> std::uint32_t {
+			return (CurCRC >> 8)
+				 ^ Table[0][std::uint8_t(CurCRC) ^ std::uint8_t(Byte)];
 		});
 }
 
