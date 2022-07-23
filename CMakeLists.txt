@@ -89,10 +89,27 @@ target_include_directories(
 	PRIVATE
 	include
 )
-set_target_properties(
-	qCheck
-	PROPERTIES
-	CXX_STANDARD 17
-	CXX_STANDARD_REQUIRED YES
-	CXX_EXTENSIONS OFF
+
+### Tests
+enable_testing()
+
+find_package(Catch2 REQUIRED)
+add_library(catch ALIAS Catch2::Catch2)
+
+add_executable(
+	CRC32_test
+	tests/main.cpp
+	tests/CRC32.cpp
 )
+target_link_libraries(
+	CRC32_test
+	PRIVATE
+	catch
+)
+target_include_directories(
+	CRC32_test
+	PRIVATE
+	include
+)
+
+add_test(CRC32_test CRC32_test)
