@@ -169,3 +169,44 @@ TEST_CASE("mt19937_32x997 (byte)", "[CRC32]")
 		= CRC::Checksum<0xEDB88320u>(std::as_bytes(std::span{Data}));
 	REQUIRE(Checksum == 0x83041FE4);
 }
+
+TEST_CASE("mt19937_32x1024x2 Combine", "[CRC32]")
+{
+	std::mt19937 MersenneTwister;
+
+	MersenneTwister.seed(0);
+	std::array<std::uint32_t, 1024> DataA = {};
+	for( auto& CurValue : DataA )
+	{
+		CurValue = MersenneTwister();
+	}
+
+	std::array<std::uint32_t, 1024> DataB = {};
+	for( auto& CurValue : DataB )
+	{
+		CurValue = MersenneTwister();
+	}
+
+	MersenneTwister.seed(0);
+	std::array<std::uint32_t, 2048> DataAB = {};
+	for( auto& CurValue : DataAB )
+	{
+		CurValue = MersenneTwister();
+	}
+
+	const std::uint32_t ChecksumA
+		= CRC::Checksum<0xEDB88320u>(std::as_bytes(std::span{DataA}));
+	REQUIRE(ChecksumA == 0xE3F613F7);
+
+	const std::uint32_t ChecksumB
+		= CRC::Checksum<0xEDB88320u>(std::as_bytes(std::span{DataB}));
+	REQUIRE(ChecksumB == 0xB66E71C9);
+
+	const std::uint32_t ChecksumAB
+		= CRC::Checksum<0xEDB88320u>(std::as_bytes(std::span{DataAB}));
+	REQUIRE(ChecksumAB == 0x045B99A0);
+
+	const std::uint32_t ChecksumABCombine = CRC::Checksum<0xEDB88320u>(
+		std::as_bytes(std::span{DataB}), ChecksumA);
+	REQUIRE(ChecksumABCombine == 0x045B99A0);
+}
