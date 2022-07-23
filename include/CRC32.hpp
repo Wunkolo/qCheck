@@ -82,10 +82,11 @@ inline std::uint32_t _mm256_hxor_epi32(__m256i a)
 #endif
 
 template<std::uint32_t Polynomial>
-std::uint32_t Checksum(std::span<const std::byte> Data)
+std::uint32_t
+	Checksum(std::span<const std::byte> Data, std::uint32_t InitialValue = 0u)
 {
 	static constexpr auto Table = CRC32Table(Polynomial);
-	std::uint32_t         CRC   = ~0;
+	std::uint32_t         CRC   = ~InitialValue;
 
 	// Slice by 16
 	{
