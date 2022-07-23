@@ -8,83 +8,6 @@
 #ifdef __x86_64__
 #include <x86intrin.h>
 #endif
-
-#ifdef __PCLMUL__
-constexpr std::uint32_t BitReverse32(std::uint32_t Value)
-{
-	std::uint32_t Reversed = 0;
-	for( std::uint32_t BitIndex = 0u; BitIndex < 32u; ++BitIndex )
-	{
-		Reversed = (Reversed << 1u) + (Value & 0b1);
-		Value >>= 1u;
-	}
-	return Reversed;
-}
-
-// BitReverse(x^(shift) mod P(x) << 32) << 1
-constexpr std::uint64_t
-	KnConstant(std::uint32_t ByteShift, std::uint32_t Polynomial)
-{
-	std::uint32_t Remainder = 1u << 24;
-	for( std::size_t i = 5; i <= (ByteShift + 1); ++i )
-	{
-		for( std::int8_t BitIndex = 0; BitIndex < 8; ++BitIndex )
-		{
-			// Remainder is about to overflow, increment quotient
-			if( Remainder >> 31u )
-			{
-				Remainder <<= 1u;        // r *= x
-				Remainder ^= Polynomial; // r += poly
-			}
-			else
-			{
-				Remainder <<= 1u; // r *= 2
-			}
-		}
-	}
-	return static_cast<std::uint64_t>(BitReverse32(Remainder)) << 1;
-}
-
-// BitReverse(x^64 / P(x)) << 1
-constexpr std::uint64_t MuConstant(uint32_t Polynomial)
-{
-	std::uint32_t Remainder = 1u << 24;
-	std::uint32_t Quotient  = 0u;
-	for( std::size_t i = 5; i <= 9; ++i )
-	{
-		for( std::int8_t BitIndex = 0; BitIndex < 8; ++BitIndex )
-		{
-			Quotient <<= 1u; // q *= x
-			// Remainder is about to overflow, increment quotient
-			if( Remainder >> 31u )
-			{
-				Remainder <<= 1u;        // r *= x
-				Remainder ^= Polynomial; // + poly
-				Quotient |= 1u;          // + x^0
-			}
-			else
-			{
-				Remainder <<= 1u; // r *= 2
-			}
-		}
-	}
-	return (static_cast<std::uint64_t>(BitReverse32(Quotient)) << 1u) | 1;
-}
-
-#define POLY 0x1EDC6F41
-#define IEEEPOLY 0x04C11DB7
-
-// clang-format off
-static_assert(KnConstant(  64 + 4, IEEEPOLY) == 0x154442BD4);
-static_assert(KnConstant(  64 - 4, IEEEPOLY) == 0x1C6E41596);
-static_assert(KnConstant(  16 + 4, IEEEPOLY) == 0x1751997D0);
-static_assert(KnConstant(  16 - 4, IEEEPOLY) == 0x0ccaa009e);
-static_assert(KnConstant(       8, IEEEPOLY) == 0x163cd6124);
-static_assert(KnConstant(       4, IEEEPOLY) == 0x1db710640);
-static_assert(MuConstant(          IEEEPOLY) == 0x1F7011641);
-// clang-format on
-#endif
-
 namespace CRC
 {
 
@@ -157,12 +80,222 @@ inline std::uint32_t _mm256_hxor_epi32(__m256i a)
 }
 #endif
 
+#ifdef __PCLMUL__
+constexpr std::uint32_t BitReverse32(std::uint32_t Value)
+{
+	std::uint32_t Reversed = 0;
+	for( std::uint32_t BitIndex = 0u; BitIndex < 32u; ++BitIndex )
+	{
+		Reversed = (Reversed << 1u) + (Value & 0b1);
+		Value >>= 1u;
+	}
+	return Reversed;
+}
+
+// BitReverse(x^(shift) mod P(x) << 32) << 1
+constexpr std::uint64_t
+	KnConstant(std::uint32_t ByteShift, std::uint32_t Polynomial)
+{
+	std::uint32_t Remainder = 1u << 24;
+	for( std::size_t i = 5; i <= (ByteShift + 1); ++i )
+	{
+		for( std::int8_t BitIndex = 0; BitIndex < 8; ++BitIndex )
+		{
+			// Remainder is about to overflow, increment quotient
+			if( Remainder >> 31u )
+			{
+				Remainder <<= 1u;        // r *= x
+				Remainder ^= Polynomial; // r += poly
+			}
+			else
+			{
+				Remainder <<= 1u; // r *= 2
+			}
+		}
+	}
+	return static_cast<std::uint64_t>(BitReverse32(Remainder)) << 1;
+}
+
+// BitReverse(x^64 / P(x)) << 1
+constexpr std::uint64_t MuConstant(uint32_t Polynomial)
+{
+	std::uint32_t Remainder = 1u << 24;
+	std::uint32_t Quotient  = 0u;
+	for( std::size_t i = 5; i <= 9; ++i )
+	{
+		for( std::int8_t BitIndex = 0; BitIndex < 8; ++BitIndex )
+		{
+			Quotient <<= 1u; // q *= x
+			// Remainder is about to overflow, increment quotient
+			if( Remainder >> 31u )
+			{
+				Remainder <<= 1u;        // r *= x
+				Remainder ^= Polynomial; // + poly
+				Quotient |= 1u;          // + x^0
+			}
+			else
+			{
+				Remainder <<= 1u; // r *= 2
+			}
+		}
+	}
+	return (static_cast<std::uint64_t>(BitReverse32(Quotient)) << 1u) | 1;
+}
+
+#define POLY 0x1EDC6F41
+#define IEEEPOLY 0x04C11DB7
+
+// clang-format off
+static_assert(KnConstant( 64 + 4, IEEEPOLY) == 0x154442BD4);
+static_assert(KnConstant( 64 - 4, IEEEPOLY) == 0x1C6E41596);
+static_assert(KnConstant( 16 + 4, IEEEPOLY) == 0x1751997D0);
+static_assert(KnConstant( 16 - 4, IEEEPOLY) == 0x0CCAA009E);
+static_assert(KnConstant(      8, IEEEPOLY) == 0x163CD6124);
+static_assert(KnConstant(      4, IEEEPOLY) == 0x1DB710640);
+static_assert(MuConstant(         IEEEPOLY) == 0x1F7011641);
+// clang-format on
+
+template<std::uint32_t Polynomial>
+std::uint32_t
+	CRC32_PCLMULQDQ(std::span<const std::byte> Data, std::uint32_t CRC)
+{
+
+	__m128i CRCVec0 = reinterpret_cast<const __m128i*>(Data.data())[0];
+	__m128i CRCVec1 = reinterpret_cast<const __m128i*>(Data.data())[1];
+	__m128i CRCVec2 = reinterpret_cast<const __m128i*>(Data.data())[2];
+	__m128i CRCVec3 = reinterpret_cast<const __m128i*>(Data.data())[3];
+
+	Data = Data.subspan(64);
+
+	CRCVec0 = _mm_xor_si128(CRCVec0, _mm_cvtsi32_si128(CRC));
+
+	// Fold 512 bits at a time
+	// Todo: VPCLMULQDQ(AVX2, AVX512)
+	for( ; Data.size() >= 64; Data = Data.subspan(64) )
+	{
+		static const __m128i K1K2 = _mm_set_epi64x(
+			KnConstant(64 - 4, Polynomial), KnConstant(64 + 4, Polynomial));
+
+		const __m128i MulLo0 = _mm_clmulepi64_si128(CRCVec0, K1K2, 0b0000'0000);
+		const __m128i MulLo1 = _mm_clmulepi64_si128(CRCVec1, K1K2, 0b0000'0000);
+		const __m128i MulLo2 = _mm_clmulepi64_si128(CRCVec2, K1K2, 0b0000'0000);
+		const __m128i MulLo3 = _mm_clmulepi64_si128(CRCVec3, K1K2, 0b0000'0000);
+
+		const __m128i MulHi0 = _mm_clmulepi64_si128(CRCVec0, K1K2, 0b0001'0001);
+		const __m128i MulHi1 = _mm_clmulepi64_si128(CRCVec1, K1K2, 0b0001'0001);
+		const __m128i MulHi2 = _mm_clmulepi64_si128(CRCVec2, K1K2, 0b0001'0001);
+		const __m128i MulHi3 = _mm_clmulepi64_si128(CRCVec3, K1K2, 0b0001'0001);
+
+		const __m128i Load0 = reinterpret_cast<const __m128i*>(Data.data())[0];
+		const __m128i Load1 = reinterpret_cast<const __m128i*>(Data.data())[1];
+		const __m128i Load2 = reinterpret_cast<const __m128i*>(Data.data())[2];
+		const __m128i Load3 = reinterpret_cast<const __m128i*>(Data.data())[3];
+
+		CRCVec0 = _mm_xor_si128(_mm_xor_si128(MulHi0, MulLo0), Load0);
+		CRCVec1 = _mm_xor_si128(_mm_xor_si128(MulHi1, MulLo1), Load1);
+		CRCVec2 = _mm_xor_si128(_mm_xor_si128(MulHi2, MulLo2), Load2);
+		CRCVec3 = _mm_xor_si128(_mm_xor_si128(MulHi3, MulLo3), Load3);
+	}
+
+	// Reduce 512 to 128
+	static const __m128i K3K4 = _mm_set_epi64x(
+		KnConstant(16 - 4, Polynomial), KnConstant(16 + 4, Polynomial));
+
+	// Reduce Vec1 into Vec0
+	{
+		const __m128i MulLo = _mm_clmulepi64_si128(CRCVec0, K3K4, 0b0000'0000);
+		const __m128i MulHi = _mm_clmulepi64_si128(CRCVec0, K3K4, 0b0001'0001);
+		CRCVec0 = _mm_xor_si128(_mm_xor_si128(MulHi, MulLo), CRCVec1);
+	}
+
+	// Reduce Vec2 into Vec0
+	{
+		const __m128i MulLo = _mm_clmulepi64_si128(CRCVec0, K3K4, 0b0000'0000);
+		const __m128i MulHi = _mm_clmulepi64_si128(CRCVec0, K3K4, 0b0001'0001);
+		CRCVec0 = _mm_xor_si128(_mm_xor_si128(MulHi, MulLo), CRCVec2);
+	}
+
+	// Reduce Vec3 into Vec0
+	{
+		const __m128i MulLo = _mm_clmulepi64_si128(CRCVec0, K3K4, 0b0000'0000);
+		const __m128i MulHi = _mm_clmulepi64_si128(CRCVec0, K3K4, 0b0001'0001);
+		CRCVec0 = _mm_xor_si128(_mm_xor_si128(MulHi, MulLo), CRCVec3);
+	}
+
+	// Fold 128 bits at a time
+	for( ; Data.size() >= 16; Data = Data.subspan(16) )
+	{
+		const __m128i Load = *reinterpret_cast<const __m128i*>(Data.data());
+
+		const __m128i MulLo = _mm_clmulepi64_si128(CRCVec0, K3K4, 0b0000'0000);
+		const __m128i MulHi = _mm_clmulepi64_si128(CRCVec0, K3K4, 0b0001'0001);
+
+		CRCVec0 = _mm_xor_si128(_mm_xor_si128(MulHi, MulLo), Load);
+	}
+
+	// Reduce 128 to 64
+	static const __m128i Lo32Mask64 = _mm_set1_epi64x(0xFFFFFFFF);
+	{
+		const __m128i MulHiLo
+			= _mm_clmulepi64_si128(CRCVec0, K3K4, 0b0001'0000);
+
+		const __m128i Upper64 = _mm_srli_si128(CRCVec0, 8);
+
+		CRCVec0 = _mm_xor_si128(Upper64, MulHiLo);
+
+		static const __m128i K5K0
+			= _mm_cvtsi64_si128(KnConstant(8, Polynomial));
+
+		const __m128i Upper96 = _mm_srli_si128(CRCVec0, 4);
+
+		const __m128i Trunc32 = _mm_and_si128(CRCVec0, Lo32Mask64);
+
+		const __m128i MulLo = _mm_clmulepi64_si128(Trunc32, K5K0, 0b0000'0000);
+
+		CRCVec0 = _mm_xor_si128(MulLo, Upper96);
+	}
+
+	// Reduce 64 to 32
+	{
+		static const __m128i Poly = _mm_set_epi64x(
+			MuConstant(Polynomial), KnConstant(4, Polynomial) | 1);
+
+		__m128i Trunc32 = _mm_and_si128(CRCVec0, Lo32Mask64);
+
+		const __m128i MulHiLo
+			= _mm_clmulepi64_si128(Trunc32, Poly, 0b0001'0000);
+
+		Trunc32             = _mm_and_si128(MulHiLo, Lo32Mask64);
+		const __m128i MulLo = _mm_clmulepi64_si128(Trunc32, Poly, 0b0000'0000);
+
+		CRCVec0 = _mm_xor_si128(CRCVec0, MulLo);
+	}
+
+	return _mm_extract_epi32(CRCVec0, 1);
+}
+#endif
+
 template<std::uint32_t Polynomial>
 std::uint32_t
 	Checksum(std::span<const std::byte> Data, std::uint32_t InitialValue = 0u)
 {
 	static constexpr auto Table = CRC32Table(Polynomial);
 	std::uint32_t         CRC   = ~InitialValue;
+
+#ifdef __PCLMUL__
+	if( Data.size() >= 64 )
+	{
+		if( Data.size() % 16 == 0 )
+		{
+			return ~CRC32_PCLMULQDQ<BitReverse32(Polynomial)>(Data, CRC);
+		}
+		else
+		{
+			CRC = CRC32_PCLMULQDQ<BitReverse32(Polynomial)>(Data, CRC);
+			return Checksum<Polynomial>(Data.last(Data.size() % 16), ~CRC);
+		}
+	}
+#endif
 
 	// Slice by 16
 	{
