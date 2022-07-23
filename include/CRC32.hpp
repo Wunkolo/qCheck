@@ -2,6 +2,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <numeric>
 
 #ifdef __AVX2__
 #include <immintrin.h>
