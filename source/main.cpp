@@ -12,7 +12,6 @@
 
 #include <filesystem>
 #include <fstream>
-#include <iterator>
 #include <queue>
 #include <utility>
 #include <vector>
@@ -57,24 +56,35 @@ std::uint32_t ChecksumFile(const std::filesystem::path& Path)
 	// Use a faster mmap path.
 	if( std::filesystem::is_regular_file(Path, CurError) )
 	{
-		const std::uintmax_t FileSize   = std::filesystem::file_size(Path);
-		const auto           FileHandle = open(Path.c_str(), O_RDONLY, 0);
-		void*                FileMap    = mmap(
-							  nullptr, FileSize, PROT_READ, MAP_SHARED | MAP_POPULATE, FileHandle,
-							  0);
+		const std::size_t FileSize   = std::filesystem::file_size(Path);
+		const auto        FileHandle = open(Path.c_str(), O_RDONLY, 0);
+		void*             FileMap    = mmap(
+						   nullptr, FileSize, PROT_READ, MAP_SHARED | MAP_POPULATE, FileHandle,
+						   0);
+
+		const auto FileData = std::span<const std::byte>(
+			reinterpret_cast<const std::byte*>(FileMap), FileSize);
+
 		madvise(FileMap, FileSize, MADV_SEQUENTIAL | MADV_WILLNEED);
-		CRC32 = CRC::Checksum<0xEDB88320u, const std::uint8_t*>(
-			reinterpret_cast<const std::uint8_t*>(FileMap),
-			reinterpret_cast<const std::uint8_t*>(FileMap) + FileSize);
+
+		CRC32 = CRC::Checksum<0xEDB88320u>(FileData);
+
 		munmap((void*)FileMap, FileSize);
 		close(FileHandle);
 	}
 	else
 	{
 		std::ifstream CurFile(Path, std::ios::binary);
-		CRC32 = CRC::Checksum<0xEDB88320u>(
-			std::istreambuf_iterator<char>(CurFile),
-			std::istreambuf_iterator<char>());
+
+		std::array<std::byte, 1024> Buffer;
+		while( CurFile.read(
+			reinterpret_cast<char*>(Buffer.data()), Buffer.size()) )
+		{
+			CRC32 ^= CRC::Checksum<0xEDB88320u>(Buffer);
+		}
+
+		CRC32 ^= CRC::Checksum<0xEDB88320u>(
+			std::span(Buffer).subspan(0, CurFile.gcount()));
 	}
 
 	return CRC32;

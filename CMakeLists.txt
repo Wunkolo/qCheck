@@ -50,6 +50,8 @@ elseif( CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang" )
 		add_compile_options( -fdiagnostics-color=always )
 	endif()
 
+	# add_compile_options(-march=native)
+
 	add_compile_options(
 		-Wall
 		-Warray-bounds

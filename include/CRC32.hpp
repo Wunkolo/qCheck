@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <numeric>
+#include <span>
 
 #ifdef __AVX2__
 #include <immintrin.h>
@@ -80,17 +81,11 @@ inline std::uint32_t _mm256_hxor_epi32(__m256i a)
 }
 #endif
 
-// Todo: This should technically be "contiguous_iterator_tag" from C++20
-template<typename RandomIterator, std::uint32_t Polynomial>
-std::uint32_t Checksum(
-	RandomIterator First, RandomIterator Last, std::random_access_iterator_tag)
+template<std::uint32_t Polynomial>
+std::uint32_t Checksum(std::span<const std::byte> Data)
 {
 	static constexpr auto Table = CRC32Table(Polynomial);
 	std::uint32_t         CRC   = ~0;
-	// const std::size_t Size = static_cast<std::size_t>(std::distance(First,
-	// Last));
-	const std::uint32_t* Input32
-		= reinterpret_cast<const std::uint32_t*>(&(*First));
 
 	// Slice by 16
 	{
@@ -118,15 +113,15 @@ std::uint32_t Checksum(
 			(sizeof(typename decltype(Table)::value_type) / 4) * 13,
 			(sizeof(typename decltype(Table)::value_type) / 4) * 14,
 			(sizeof(typename decltype(Table)::value_type) / 4) * 15);
-		for( ; std::distance(First, Last) / 16; First += 16 )
+		for( ; Data.size() / 16; )
 		{
 			// Load in 8 bytes
 			const std::uint64_t Input64Lo
-				= *reinterpret_cast<const std::uint64_t*>(Input32) ^ CRC;
-			Input32 += 2;
+				= *reinterpret_cast<const std::uint64_t*>(Data.data()) ^ CRC;
+			Data = Data.subspan(sizeof(std::uint64_t));
 			const std::uint64_t Input64Hi
-				= *reinterpret_cast<const std::uint64_t*>(Input32);
-			Input32 += 2;
+				= *reinterpret_cast<const std::uint64_t*>(Data.data());
+			Data = Data.subspan(sizeof(std::uint64_t));
 			// Spread out each byte into a eight 32-bit lanes, in each 256-bit
 			// lane
 			const __m512i Indices = _mm512_shuffle_epi8(
@@ -143,13 +138,25 @@ std::uint32_t Checksum(
 				_mm512_extracti32x8_epi32(Gather, 1)));
 		}
 #else
-		for( ; std::distance(First, Last) / 16; First += 16 )
+		for( ; Data.size() / 16; )
 		{
-			const std::uint32_t InputLoLo = *Input32++ ^ CRC;
-			const std::uint32_t InputHiLo = *Input32++;
-			const std::uint32_t InputLoHi = *Input32++;
-			const std::uint32_t InputHiHi = *Input32++;
-			CRC                           = Table[15][std::uint8_t(InputLoLo)]
+			const std::uint32_t InputLoLo
+				= *reinterpret_cast<const std::uint32_t*>(Data.data()) ^ CRC;
+			Data = Data.subspan(sizeof(std::uint32_t));
+
+			const std::uint32_t InputHiLo
+				= *reinterpret_cast<const std::uint32_t*>(Data.data());
+			Data = Data.subspan(sizeof(std::uint32_t));
+
+			const std::uint32_t InputLoHi
+				= *reinterpret_cast<const std::uint32_t*>(Data.data());
+			Data = Data.subspan(sizeof(std::uint32_t));
+
+			const std::uint32_t InputHiHi
+				= *reinterpret_cast<const std::uint32_t*>(Data.data());
+			Data = Data.subspan(sizeof(std::uint32_t));
+
+			CRC = Table[15][std::uint8_t(InputLoLo)]
 				^ Table[14][std::uint8_t(InputLoLo >> 8)]
 				^ Table[13][std::uint8_t(InputLoLo >> 16)]
 				^ Table[12][std::uint8_t(InputLoLo >> 24)]
@@ -185,12 +192,12 @@ std::uint32_t Checksum(
 			(sizeof(typename decltype(Table)::value_type) / 4) * 5,
 			(sizeof(typename decltype(Table)::value_type) / 4) * 6,
 			(sizeof(typename decltype(Table)::value_type) / 4) * 7);
-		for( ; std::distance(First, Last) / 8; First += 8 )
+		for( ; Data.size() / 8; Data.subspan(8) )
 		{
 			// Load in 8 bytes
 			const std::uint64_t Input64
-				= *reinterpret_cast<const std::uint64_t*>(Input32) ^ CRC;
-			Input32 += 2;
+				= *reinterpret_cast<const std::uint64_t*>(Data.data()) ^ CRC;
+			Data = Data.subspan(sizeof(std::uint64_t));
 			// Spread out each byte into a eight 32-bit lanes
 			const __m256i Indices
 				= _mm256_shuffle_epi8(_mm256_set1_epi64x(Input64), ByteIndex);
@@ -201,11 +208,17 @@ std::uint32_t Checksum(
 			CRC = _mm256_hxor_epi32(Gather);
 		}
 #else
-		for( ; std::distance(First, Last) / 8; First += 8 )
+		for( ; Data.size() / 8; )
 		{
-			const std::uint32_t InputLo = *Input32++ ^ CRC;
-			const std::uint32_t InputHi = *Input32++;
-			CRC                         = Table[7][std::uint8_t(InputLo)]
+			const std::uint32_t InputLo
+				= *reinterpret_cast<const std::uint32_t*>(Data.data()) ^ CRC;
+			Data = Data.subspan(sizeof(std::uint32_t));
+
+			const std::uint32_t InputHi
+				= *reinterpret_cast<const std::uint32_t*>(Data.data());
+			Data = Data.subspan(sizeof(std::uint32_t));
+
+			CRC = Table[7][std::uint8_t(InputLo)]
 				^ Table[6][std::uint8_t(InputLo >> 8)]
 				^ Table[5][std::uint8_t(InputLo >> 16)]
 				^ Table[4][std::uint8_t(InputLo >> 24)]
@@ -218,27 +231,11 @@ std::uint32_t Checksum(
 	}
 
 	return ~std::accumulate(
-		First, Last, CRC, [](std::uint32_t CRC, std::uint8_t Byte) {
-			return (CRC >> 8) ^ Table[0][std::uint8_t(CRC) ^ Byte];
+		Data.begin(), Data.end(), CRC,
+		[](std::uint32_t CRC, std::byte Byte) -> std::uint32_t {
+			return (CRC >> 8)
+				 ^ Table[0][std::uint8_t(CRC) ^ std::uint8_t(Byte)];
 		});
 }
 
-template<typename Iterator, std::uint32_t Polynomial>
-std::uint32_t Checksum(Iterator First, Iterator Last, std::input_iterator_tag)
-{
-	static constexpr auto Table = CRC32Table(Polynomial);
-	return ~std::accumulate(
-		First, Last, ~std::uint32_t(0),
-		[](std::uint32_t CRC, std::uint8_t Byte) {
-			return (CRC >> 8) ^ Table[0][std::uint8_t(CRC) ^ Byte];
-		});
-}
-
-template<std::uint32_t Polynomial, typename Iterator>
-inline std::uint32_t Checksum(Iterator First, Iterator Last)
-{
-	return Checksum<Iterator, Polynomial>(
-		First, Last,
-		typename std::iterator_traits<Iterator>::iterator_category());
-}
 } // namespace CRC

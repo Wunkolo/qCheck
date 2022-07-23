@@ -8,22 +8,21 @@
 
 TEST_CASE("CRC: Null bytes")
 {
-	std::array<std::uint8_t, 0> NullArray;
-	REQUIRE(
-		CRC::Checksum<0xEDB88320u, const std::uint8_t*>(
-			NullArray.begin(), NullArray.end())
-		== 0x0);
+	std::array<std::uint8_t, 0> Data;
+
+	const std::uint32_t Checksum
+		= CRC::Checksum<0xEDB88320u>(std::as_bytes(std::span{Data}));
+	REQUIRE(Checksum == 0x0);
 }
 
 TEST_CASE("CRC: IOTAx8 (byte)")
 {
 	std::array<std::uint8_t, 8> Data;
-
 	std::iota(Data.begin(), Data.end(), 0);
-	REQUIRE(
-		CRC::Checksum<0xEDB88320u, const std::uint8_t*>(
-			Data.begin(), Data.end())
-		== 0x88aa689f);
+
+	const std::uint32_t Checksum
+		= CRC::Checksum<0xEDB88320u>(std::as_bytes(std::span{Data}));
+	REQUIRE(Checksum == 0x88aa689f);
 }
 
 TEST_CASE("CRC: IOTAx16 (byte)")
@@ -32,8 +31,7 @@ TEST_CASE("CRC: IOTAx16 (byte)")
 	std::iota(Data.begin(), Data.end(), 0);
 
 	const std::uint32_t Checksum
-		= CRC::Checksum<0xEDB88320u, const std::uint8_t*>(
-			Data.begin(), Data.end());
+		= CRC::Checksum<0xEDB88320u>(std::as_bytes(std::span{Data}));
 	REQUIRE(Checksum == 0xcecee288);
 }
 
@@ -43,8 +41,7 @@ TEST_CASE("CRC: IOTAx32 (byte)")
 	std::iota(Data.begin(), Data.end(), 0);
 
 	const std::uint32_t Checksum
-		= CRC::Checksum<0xEDB88320u, const std::uint8_t*>(
-			Data.begin(), Data.end());
+		= CRC::Checksum<0xEDB88320u>(std::as_bytes(std::span{Data}));
 	REQUIRE(Checksum == 0x91267e8a);
 }
 
@@ -54,8 +51,7 @@ TEST_CASE("CRC: IOTAx64 (byte)")
 	std::iota(Data.begin(), Data.end(), 0);
 
 	const std::uint32_t Checksum
-		= CRC::Checksum<0xEDB88320u, const std::uint8_t*>(
-			Data.begin(), Data.end());
+		= CRC::Checksum<0xEDB88320u>(std::as_bytes(std::span{Data}));
 	REQUIRE(Checksum == 0x100ece8c);
 }
 
@@ -65,8 +61,7 @@ TEST_CASE("CRC: IOTAx128 (byte)")
 	std::iota(Data.begin(), Data.end(), 0);
 
 	const std::uint32_t Checksum
-		= CRC::Checksum<0xEDB88320u, const std::uint8_t*>(
-			Data.begin(), Data.end());
+		= CRC::Checksum<0xEDB88320u>(std::as_bytes(std::span{Data}));
 	REQUIRE(Checksum == 0x24650d57);
 }
 
@@ -76,8 +71,7 @@ TEST_CASE("CRC: IOTAx256 (byte)")
 	std::iota(Data.begin(), Data.end(), 0);
 
 	const std::uint32_t Checksum
-		= CRC::Checksum<0xEDB88320u, const std::uint8_t*>(
-			Data.begin(), Data.end());
+		= CRC::Checksum<0xEDB88320u>(std::as_bytes(std::span{Data}));
 	REQUIRE(Checksum == 0x29058c73);
 }
 
@@ -87,8 +81,7 @@ TEST_CASE("CRC: IOTAx512 (byte)")
 	std::iota(Data.begin(), Data.end(), 0);
 
 	const std::uint32_t Checksum
-		= CRC::Checksum<0xEDB88320u, const std::uint8_t*>(
-			Data.begin(), Data.end());
+		= CRC::Checksum<0xEDB88320u>(std::as_bytes(std::span{Data}));
 	REQUIRE(Checksum == 0x1c613576);
 }
 
@@ -98,8 +91,7 @@ TEST_CASE("CRC: IOTAx1024 (byte)")
 	std::iota(Data.begin(), Data.end(), 0);
 
 	const std::uint32_t Checksum
-		= CRC::Checksum<0xEDB88320u, const std::uint8_t*>(
-			Data.begin(), Data.end());
+		= CRC::Checksum<0xEDB88320u>(std::as_bytes(std::span{Data}));
 	REQUIRE(Checksum == 0xb70b4c26);
 }
 
@@ -109,6 +101,6 @@ TEST_CASE("CRC: \'penguin\'")
 	const auto Data     = std::string_view(String);
 
 	const std::uint32_t Checksum
-		= CRC::Checksum<0xEDB88320u, const char*>(Data.cbegin(), Data.cend());
+		= CRC::Checksum<0xEDB88320u>(std::as_bytes(std::span{Data}));
 	REQUIRE(Checksum == 0x0e5c1a120);
 }
