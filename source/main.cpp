@@ -12,6 +12,7 @@
 
 #include <filesystem>
 #include <fstream>
+#include <optional>
 #include <queue>
 #include <utility>
 #include <vector>
@@ -48,8 +49,8 @@ const static struct option CommandOptions[]
 	   {"help", no_argument, nullptr, 'h'},
 	   {nullptr, no_argument, nullptr, '\0'}};
 
-std::uint32_t ChecksumFile(const std::filesystem::path& Path);
-int           Check(const Settings& CurSettings);
+std::optional<std::uint32_t> ChecksumFile(const std::filesystem::path& Path);
+int                          Check(const Settings& CurSettings);
 
 int main(int argc, char* argv[])
 {
@@ -132,8 +133,8 @@ int main(int argc, char* argv[])
 
 	for( const auto& CurPath : CurSettings.InputFiles )
 	{
-		std::error_code CurError;
-		std::size_t     FileSize = std::filesystem::file_size(CurPath);
+		std::error_code   CurError;
+		const std::size_t FileSize = std::filesystem::file_size(CurPath);
 
 		char        TimeString[64] = {0};
 		struct stat FileStat       = {};
@@ -168,19 +169,38 @@ int main(int argc, char* argv[])
 					if( EntryIndex >= FileList.size() )
 						return;
 					const std::filesystem::path& CurPath = FileList[EntryIndex];
-					const std::uint32_t          CRC32 = ChecksumFile(CurPath);
+					const std::optional<std::uint32_t> CRC32
+						= ChecksumFile(CurPath);
 					// If writing to a terminal, put some pretty colored output
-					if( isatty(fileno(stdout)) )
+					if( CRC32.has_value() )
 					{
-						std::fprintf(
-							stdout, "\e[36m%s\t\e[33m%08X\e[0m\n",
-							CurPath.filename().c_str(), CRC32);
+						if( isatty(fileno(stdout)) )
+						{
+							std::fprintf(
+								stdout, "\e[36m%s\t\e[33m%08X\e[0m\n",
+								CurPath.filename().c_str(), CRC32.value());
+						}
+						else
+						{
+							std::fprintf(
+								stdout, "%s %08X\n", CurPath.filename().c_str(),
+								CRC32.value());
+						}
 					}
 					else
 					{
-						std::fprintf(
-							stdout, "%s %08X\n", CurPath.filename().c_str(),
-							CRC32);
+						if( isatty(fileno(stdout)) )
+						{
+							std::fprintf(
+								stdout, "\e[36m%s\t\e[31mERROR\e[0m\n",
+								CurPath.filename().c_str());
+						}
+						else
+						{
+							std::fprintf(
+								stdout, "%s ERROR\n",
+								CurPath.filename().c_str());
+						}
 					}
 				}
 			},
@@ -192,20 +212,29 @@ int main(int argc, char* argv[])
 	return EXIT_SUCCESS;
 }
 
-std::uint32_t ChecksumFile(const std::filesystem::path& Path)
+std::optional<std::uint32_t> ChecksumFile(const std::filesystem::path& Path)
 {
-	std::uint32_t   CRC32 = 0;
-	std::error_code CurError;
-	// Regular file sitting on some storage media, unchanging
-	// Use a faster mmap path.
-	if( std::filesystem::is_regular_file(Path, CurError) )
-	{
-		const std::size_t FileSize   = std::filesystem::file_size(Path);
-		const auto        FileHandle = open(Path.c_str(), O_RDONLY, 0);
-		void*             FileMap    = mmap(
-						   nullptr, FileSize, PROT_READ, MAP_SHARED | MAP_POPULATE, FileHandle,
-						   0);
+	std::uint32_t     CRC32 = 0;
+	std::error_code   CurError;
+	const std::size_t FileSize = std::filesystem::file_size(Path, CurError);
 
+	if( CurError )
+	{
+		return std::nullopt;
+	}
+
+	const int FileHandle = open(Path.c_str(), O_RDONLY, 0);
+	if( FileHandle == -1 )
+	{
+		return std::nullopt;
+	}
+
+	// Try to map the file, upon failure, use regular file-descriptor reads
+	void* FileMap = mmap(
+		nullptr, FileSize, PROT_READ, MAP_SHARED | MAP_POPULATE, FileHandle, 0);
+
+	if( std::uintptr_t(FileMap) != -1ULL )
+	{
 		const auto FileData = std::span<const std::byte>(
 			reinterpret_cast<const std::byte*>(FileMap), FileSize);
 
@@ -214,22 +243,21 @@ std::uint32_t ChecksumFile(const std::filesystem::path& Path)
 		CRC32 = CRC::Checksum<0xEDB88320u>(FileData);
 
 		munmap((void*)FileMap, FileSize);
-		close(FileHandle);
 	}
 	else
 	{
-		std::ifstream CurFile(Path, std::ios::binary);
+		std::array<std::byte, 4096> Buffer;
 
-		std::array<std::byte, 1024> Buffer;
-		while( CurFile.read(
-			reinterpret_cast<char*>(Buffer.data()), Buffer.size()) )
+		ssize_t ReadCount = read(FileHandle, Buffer.data(), Buffer.size());
+		while( ReadCount > 0 )
 		{
-			CRC32 ^= CRC::Checksum<0xEDB88320u>(Buffer);
+			CRC32 = CRC::Checksum<0xEDB88320u>(
+				std::span(Buffer).subspan(0, ReadCount), CRC32);
+			ReadCount = read(FileHandle, Buffer.data(), Buffer.size());
 		}
-
-		CRC32 ^= CRC::Checksum<0xEDB88320u>(
-			std::span(Buffer).subspan(0, CurFile.gcount()));
 	}
+
+	close(FileHandle);
 
 	return CRC32;
 }
@@ -308,15 +336,17 @@ int Check(const Settings& CurSettings)
 					if( EntryIndex >= Checkqueue.size() )
 						return;
 					const CheckEntry& CurEntry = Checkqueue[EntryIndex];
-					if( std::filesystem::is_regular_file(CurEntry.FilePath) )
+
+					const std::optional<std::uint32_t> CurSum
+						= ChecksumFile(CurEntry.FilePath);
+
+					if( CurSum.has_value() )
 					{
-						const std::uint32_t CurSum
-							= ChecksumFile(CurEntry.FilePath);
 						const bool Valid = CurEntry.Checksum == CurSum;
 						std::printf(
 							"\e[36m%s\t\e[33m%08X\e[37m...%s%08X\t%s\e[0m\n",
 							CurEntry.FilePath.c_str(), CurEntry.Checksum,
-							Valid ? "\e[32m" : "\e[31m", CurSum,
+							Valid ? "\e[32m" : "\e[31m", CurSum.value(),
 							Valid ? "\e[32mOK" : "\e[31mFAIL");
 					}
 					else
