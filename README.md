@@ -18,6 +18,19 @@ saturate read speed.
 
 ---
 
+## Install
+### Manual
+```
+$ git clone https://github.com/Wunkolo/qCheck.git qCheck/src
+$ cmake -B qCheck/build -S qCheck/src -DCMAKE_BUILD_TYPE=Release
+$ cmake --build qCheck/build --config Release
+# install -Dm+x "qCheck/build/qCheck" "/usr/local/bin/qCheck"
+```
+
+### Packages
+[ArchLinux](https://aur.archlinux.org/packages/qcheck-git)
+
+
 ## Benchmark
 
 Specs:
