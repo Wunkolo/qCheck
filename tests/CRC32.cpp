@@ -109,7 +109,6 @@ TEST_CASE("\'penguin\'", "[CRC32]")
 TEST_CASE("mt19937_32x1024", "[CRC32]")
 {
 	std::mt19937 MersenneTwister;
-	MersenneTwister.seed(0);
 
 	std::array<std::uint32_t, 1024> Data = {};
 	for( auto& CurValue : Data )
@@ -119,13 +118,12 @@ TEST_CASE("mt19937_32x1024", "[CRC32]")
 
 	const std::uint32_t Checksum
 		= CRC::Checksum<0xEDB88320u>(std::as_bytes(std::span{Data}));
-	REQUIRE(Checksum == 0xE3F613F7);
+	REQUIRE(Checksum == 0x25396D17);
 }
 
 TEST_CASE("mt19937_64x1024", "[CRC32]")
 {
 	std::mt19937_64 MersenneTwister;
-	MersenneTwister.seed(0);
 
 	std::array<std::uint64_t, 1024> Data = {};
 	for( auto& CurValue : Data )
@@ -135,13 +133,12 @@ TEST_CASE("mt19937_64x1024", "[CRC32]")
 
 	const std::uint32_t Checksum
 		= CRC::Checksum<0xEDB88320u>(std::as_bytes(std::span{Data}));
-	REQUIRE(Checksum == 0X4AAEC4DF);
+	REQUIRE(Checksum == 0x46BD489B);
 }
 
 TEST_CASE("mt19937_32x797 (byte)", "[CRC32]")
 {
 	std::mt19937 MersenneTwister;
-	MersenneTwister.seed(0);
 
 	std::array<std::uint8_t, 797> Data = {};
 	for( auto& CurValue : Data )
@@ -151,13 +148,12 @@ TEST_CASE("mt19937_32x797 (byte)", "[CRC32]")
 
 	const std::uint32_t Checksum
 		= CRC::Checksum<0xEDB88320u>(std::as_bytes(std::span{Data}));
-	REQUIRE(Checksum == 0x74A9B4F2);
+	REQUIRE(Checksum == 0xB4B21120);
 }
 
 TEST_CASE("mt19937_32x997 (byte)", "[CRC32]")
 {
 	std::mt19937 MersenneTwister;
-	MersenneTwister.seed(0);
 
 	std::array<std::uint8_t, 997> Data = {};
 	for( auto& CurValue : Data )
@@ -167,14 +163,13 @@ TEST_CASE("mt19937_32x997 (byte)", "[CRC32]")
 
 	const std::uint32_t Checksum
 		= CRC::Checksum<0xEDB88320u>(std::as_bytes(std::span{Data}));
-	REQUIRE(Checksum == 0x83041FE4);
+	REQUIRE(Checksum == 0x3D27DCE0);
 }
 
 TEST_CASE("mt19937_32x1024x2 Combine", "[CRC32]")
 {
 	std::mt19937 MersenneTwister;
 
-	MersenneTwister.seed(0);
 	std::array<std::uint32_t, 1024> DataA = {};
 	for( auto& CurValue : DataA )
 	{
@@ -187,7 +182,7 @@ TEST_CASE("mt19937_32x1024x2 Combine", "[CRC32]")
 		CurValue = MersenneTwister();
 	}
 
-	MersenneTwister.seed(0);
+	MersenneTwister.seed(std::mt19937::default_seed);
 	std::array<std::uint32_t, 2048> DataAB = {};
 	for( auto& CurValue : DataAB )
 	{
@@ -196,17 +191,17 @@ TEST_CASE("mt19937_32x1024x2 Combine", "[CRC32]")
 
 	const std::uint32_t ChecksumA
 		= CRC::Checksum<0xEDB88320u>(std::as_bytes(std::span{DataA}));
-	REQUIRE(ChecksumA == 0xE3F613F7);
+	REQUIRE(ChecksumA == 0x25396D17);
 
 	const std::uint32_t ChecksumB
 		= CRC::Checksum<0xEDB88320u>(std::as_bytes(std::span{DataB}));
-	REQUIRE(ChecksumB == 0xB66E71C9);
+	REQUIRE(ChecksumB == 0x2FBB546D);
 
 	const std::uint32_t ChecksumAB
 		= CRC::Checksum<0xEDB88320u>(std::as_bytes(std::span{DataAB}));
-	REQUIRE(ChecksumAB == 0x045B99A0);
+	REQUIRE(ChecksumAB == 0x2E0FE81B);
 
 	const std::uint32_t ChecksumABCombine = CRC::Checksum<0xEDB88320u>(
 		std::as_bytes(std::span{DataB}), ChecksumA);
-	REQUIRE(ChecksumABCombine == 0x045B99A0);
+	REQUIRE(ChecksumABCombine == 0x2E0FE81B);
 }
