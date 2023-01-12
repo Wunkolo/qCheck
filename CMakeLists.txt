@@ -1,4 +1,4 @@
-cmake_minimum_required( VERSION 3.2.2 )
+cmake_minimum_required( VERSION 3.7 )
 project( qCheck )
 
 ### Standard
@@ -9,6 +9,51 @@ set( CMAKE_CXX_EXTENSIONS OFF )
 ### Verbosity
 set( CMAKE_COLOR_MAKEFILE ON )
 set( CMAKE_EXPORT_COMPILE_COMMANDS ON )
+
+### Packaging
+if( NOT DEFINED QCHECK_SNAPSHOT_TAG )
+	execute_process(
+		COMMAND git rev-parse --short HEAD
+		WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
+		OUTPUT_VARIABLE _GIT_SHORT_HASH
+		OUTPUT_STRIP_TRAILING_WHITESPACE
+	)
+	execute_process(
+		COMMAND git rev-list --count --first-parent HEAD
+		WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
+		OUTPUT_VARIABLE _GIT_REV_COUNT
+		OUTPUT_STRIP_TRAILING_WHITESPACE
+	)
+	set( QCHECK_SNAPSHOT_TAG "${_GIT_REV_COUNT}.git${_GIT_SHORT_HASH}" )
+endif()
+
+set( CPACK_GENERATOR "RPM;DEB" )
+
+set( CPACK_PACKAGE_VERSION "0" )
+set( CPACK_PACKAGE_VENDOR "Wunkolo" )
+set( CPACK_PACKAGE_DESCRIPTION "qCheck accelerates the checksum and checksum-verification process by interfacing with the .sfv file format and using a more modern approach by utilizing both multi-threaded parallelism and memory-mapped IO to reduce syscall overhead." )
+set( CPACK_PACKAGE_DESCRIPTION_SUMMARY "Generate and verify CRC32C checksum files" )
+
+set( CPACK_PACKAGING_INSTALL_PREFIX "/usr" )
+
+set( CPACK_RPM_PACKAGE_NAME "qCheck" )
+set( CPACK_RPM_PACKAGE_VERSION "0^${QCHECK_SNAPSHOT_TAG}" )
+set( CPACK_RPM_PACKAGE_RELEASE_DIST ON )
+set( CPACK_RPM_PACKAGE_LICENSE "MIT" )
+set( CPACK_RPM_PACKAGE_GROUP "System Tools" )
+set( CPACK_RPM_FILE_NAME "RPM-DEFAULT" )
+set( CPACK_RPM_BUILDREQUIRES "cmake >= 3.7, gcc-c++, catch-devel >= 2" )
+set( CPACK_RPM_SOURCE_PKG_BUILD_PARAMS "-DCMAKE_BUILD_TYPE=RelWithDebInfo -DQCHECK_SNAPSHOT_TAG=${QCHECK_SNAPSHOT_TAG}" )
+set( CPACK_RPM_DEBUGINFO_PACKAGE ON )
+set( CPACK_RPM_BUILD_SOURCE_DIRS_PREFIX "/usr/src/debug/${CPACK_RPM_PACKAGE_NAME}-${CPACK_RPM_PACKAGE_VERSION}" )
+
+set( CPACK_DEBIAN_PACKAGE_NAME "qcheck" )
+set( CPACK_DEBIAN_PACKAGE_VERSION "0+${QCHECK_SNAPSHOT_TAG}" )
+set( CPACK_DEBIAN_PACKAGE_MAINTAINER "Wunkolo <wunkolo@gmail.com>" )
+set( CPACK_DEBIAN_PACKAGE_SECTION "utils" )
+set( CPACK_DEBIAN_FILE_NAME "DEB-DEFAULT" )
+
+include( CPack )
 
 ### Optimizations
 
