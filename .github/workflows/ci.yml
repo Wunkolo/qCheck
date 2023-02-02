@@ -1,0 +1,33 @@
+name: Build and Test
+
+on: 
+  push:
+    branches:
+    - main
+    - dev
+  pull_request:
+  release:
+
+env:
+  BUILD_TYPE: Release
+
+jobs:
+  linux-build:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout 
+      uses: actions/checkout@v3
+      with:
+        submodules: 'recursive'
+
+    - name: Configure CMake
+      env:
+        CC: "gcc-10"
+        CXX: "g++-10"
+      run: cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
+
+    - name: Build
+      run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}} --target qCheck
+      
+    - name: Test
+      run: ctest --extra-verbose
