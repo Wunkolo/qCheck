@@ -142,18 +142,16 @@ target_include_directories(
 ### Tests
 enable_testing()
 
-find_package(Catch2 REQUIRED)
-add_library(catch ALIAS Catch2::Catch2)
+find_package(Catch2 3 REQUIRED)
 
 add_executable(
 	CRC32_test
-	tests/main.cpp
 	tests/CRC32.cpp
 )
 target_link_libraries(
 	CRC32_test
 	PRIVATE
-	catch
+	Catch2::Catch2WithMain
 )
 target_include_directories(
 	CRC32_test
