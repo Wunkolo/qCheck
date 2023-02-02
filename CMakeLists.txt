@@ -142,7 +142,12 @@ target_include_directories(
 ### Tests
 enable_testing()
 
-find_package(Catch2 3 REQUIRED)
+find_package(Catch2 3)
+
+if (NOT TARGET Catch2::Catch2WithMain)
+	message(WARNING "Catch2 v3 not found. Using embedded submodule")
+	add_subdirectory(externals/Catch2 EXCLUDE_FROM_ALL)
+endif()
 
 add_executable(
 	CRC32_test
