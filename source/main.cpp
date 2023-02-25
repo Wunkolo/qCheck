@@ -229,9 +229,14 @@ std::optional<std::uint32_t> ChecksumFile(const std::filesystem::path& Path)
 		return std::nullopt;
 	}
 
-	// Try to map the file, upon failure, use regular file-descriptor reads
+// Try to map the file, upon failure, use regular file-descriptor reads
+#if defined(__APPLE__)
+	void* FileMap
+		= mmap(nullptr, FileSize, PROT_READ, MAP_SHARED, FileHandle, 0);
+#else
 	void* FileMap = mmap(
 		nullptr, FileSize, PROT_READ, MAP_SHARED | MAP_POPULATE, FileHandle, 0);
+#endif
 
 	if( std::uintptr_t(FileMap) != -1ULL )
 	{
