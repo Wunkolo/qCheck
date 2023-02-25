@@ -160,7 +160,9 @@ int main(int argc, char* argv[])
 				std::size_t WorkerIndex) {
 #ifdef _POSIX_VERSION
 				char ThreadName[16] = {0};
-				std::sprintf(ThreadName, "qCheckWkr: %4zu", WorkerIndex);
+				std::snprintf(
+					ThreadName, std::size(ThreadName), "qCheckWkr: %4zu",
+					WorkerIndex);
 #if defined(__APPLE__)
 				pthread_setname_np(ThreadName);
 #else
@@ -336,7 +338,9 @@ int Check(const Settings& CurSettings)
 			 &Checkqueue = std::as_const(Checkqueue)](std::size_t WorkerIndex) {
 #ifdef _POSIX_VERSION
 				char ThreadName[16] = {0};
-				std::sprintf(ThreadName, "qCheckWkr: %4zu", WorkerIndex);
+				std::snprintf(
+					ThreadName, std::size(ThreadName), "qCheckWkr: %4zu",
+					WorkerIndex);
 #if defined(__APPLE__)
 				pthread_setname_np(ThreadName);
 #else
