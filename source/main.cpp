@@ -161,7 +161,11 @@ int main(int argc, char* argv[])
 #ifdef _POSIX_VERSION
 				char ThreadName[16] = {0};
 				std::sprintf(ThreadName, "qCheckWkr: %4zu", WorkerIndex);
+#if defined(__APPLE__)
+				pthread_setname_np(ThreadName);
+#else
 				pthread_setname_np(pthread_self(), ThreadName);
+#endif
 #endif
 				while( true )
 				{
@@ -333,7 +337,11 @@ int Check(const Settings& CurSettings)
 #ifdef _POSIX_VERSION
 				char ThreadName[16] = {0};
 				std::sprintf(ThreadName, "qCheckWkr: %4zu", WorkerIndex);
+#if defined(__APPLE__)
+				pthread_setname_np(ThreadName);
+#else
 				pthread_setname_np(pthread_self(), ThreadName);
+#endif
 #endif
 				while( true )
 				{
