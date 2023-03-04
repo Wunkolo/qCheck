@@ -330,11 +330,12 @@ int Check(const Settings& CurSettings)
 	}
 
 	std::vector<std::thread> Workers;
+	std::atomic<std::size_t> Passed{0};
 
 	for( std::size_t i = 0; i < CurSettings.Threads; ++i )
 	{
 		Workers.push_back(std::thread(
-			[&QueueLock,
+			[&Passed, &QueueLock,
 			 &Checkqueue = std::as_const(Checkqueue)](std::size_t WorkerIndex) {
 #ifdef _POSIX_VERSION
 				char ThreadName[16] = {0};
@@ -365,6 +366,8 @@ int Check(const Settings& CurSettings)
 							CurEntry.FilePath.c_str(), CurEntry.Checksum,
 							Valid ? "\e[32m" : "\e[31m", CurSum.value(),
 							Valid ? "\e[32mOK" : "\e[31mFAIL");
+						if( Valid )
+							Passed.fetch_add(1);
 					}
 					else
 					{
@@ -381,5 +384,5 @@ int Check(const Settings& CurSettings)
 	for( std::size_t i = 0; i < CurSettings.Threads; ++i )
 		Workers[i].join();
 
-	return EXIT_SUCCESS;
+	return Checkqueue.size() == Passed.load() ? EXIT_SUCCESS : EXIT_FAILURE;
 }
