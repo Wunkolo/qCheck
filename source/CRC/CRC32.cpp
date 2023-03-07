@@ -3,14 +3,9 @@
 namespace CRC
 {
 
-// TODO: This is pretty big, about 16kb total, which is almost
-// half of most processor's data cache(32kb)
-// If we use a LUT-less carryless multiply instruction, then the cache can
-// be much more properly populated with actual IO data rather than our LUT
-// https://www.intel.com/content/dam/www/public/us/en/documents/white-papers/fast-crc-computation-generic-polynomials-pclmulqdq-paper.pdf
-// - Tue 30 Jun 2020 12:04:40 PM PDT
-constexpr std::array<std::array<std::uint32_t, 256>, 16>
-	CRC32Table(std::uint32_t Polynomial) noexcept
+using CRC32TableT = std::array<std::array<std::uint32_t, 256>, 16>;
+
+constexpr CRC32TableT CRC32Table(std::uint32_t Polynomial) noexcept
 {
 	std::array<std::array<std::uint32_t, 256>, 16> Table = {};
 	// Generate main table
@@ -49,6 +44,34 @@ constexpr std::array<std::array<std::uint32_t, 256>, 16>
 	}
 
 	return Table;
+}
+
+template<Polynomial Poly>
+struct CRC32TableStatic
+{
+	const CRC32TableT& operator()() const
+	{
+		static constexpr CRC32TableT Table = CRC32Table(std::uint32_t(Poly));
+		return Table;
+	}
+};
+
+static const CRC32TableT& GetCRC32Table(Polynomial Poly)
+{
+	switch( Poly )
+	{
+	default:
+	case Polynomial::CRC32:
+		return CRC32TableStatic<Polynomial::CRC32>()();
+	case Polynomial::CRC32C:
+		return CRC32TableStatic<Polynomial::CRC32C>()();
+	case Polynomial::CRC32K:
+		return CRC32TableStatic<Polynomial::CRC32K>()();
+	case Polynomial::CRC32K2:
+		return CRC32TableStatic<Polynomial::CRC32K2>()();
+	case Polynomial::CRC32Q:
+		return CRC32TableStatic<Polynomial::CRC32Q>()();
+	}
 }
 
 #ifdef __AVX2__
@@ -262,12 +285,12 @@ std::uint32_t Checksum(
 	std::span<const std::byte> Data, std::uint32_t InitialValue,
 	Polynomial Poly)
 {
-	const std::uint32_t Polynomial32 = std::uint32_t(Poly);
 
-	const auto    Table = CRC32Table(Polynomial32);
+	const auto&   Table = GetCRC32Table(Poly);
 	std::uint32_t CRC   = ~InitialValue;
 
 #ifdef __PCLMUL__
+	const std::uint32_t Polynomial32 = std::uint32_t(Poly);
 	if( Data.size() >= 64 )
 	{
 		if( Data.size() % 16 == 0 )
