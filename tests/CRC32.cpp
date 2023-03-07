@@ -1,4 +1,4 @@
-#include "CRC32.hpp"
+#include <CRC/CRC32.hpp>
 
 #include <array>
 #include <random>
