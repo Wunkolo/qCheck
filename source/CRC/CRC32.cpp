@@ -1,33 +1,26 @@
-#pragma once
-#include <array>
-#include <cstddef>
-#include <cstdint>
-#include <numeric>
-#include <span>
+#include <CRC32.hpp>
 
-#ifdef __x86_64__
-#include <x86intrin.h>
+#if defined(__aarch64__)
+#include <arm_neon.h>
+
+#if !defined(ARMV8_OS_MACOS)
+#define __crc32d __builtin_arm_crc32d
+#define __crc32w __builtin_arm_crc32w
+#define __crc32h __builtin_arm_crc32h
+#define __crc32b __builtin_arm_crc32b
+#define __crc32cd __builtin_arm_crc32cd
+#define __crc32cw __builtin_arm_crc32cw
+#define __crc32ch __builtin_arm_crc32ch
+#define __crc32cb __builtin_arm_crc32cb
 #endif
+#endif
+
 namespace CRC
 {
 
-enum class Polynomial : std::uint32_t
-{
-	CRC32   = 0xEDB88320,
-	CRC32C  = 0x82F63B78,
-	CRC32K  = 0xEB31D82E,
-	CRC32K2 = 0x992C1A4C,
-	CRC32Q  = 0xD5828281,
-};
+using CRC32TableT = std::array<std::array<std::uint32_t, 256>, 16>;
 
-// TODO: This is pretty big, about 16kb total, which is almost
-// half of most processor's data cache(32kb)
-// If we use a LUT-less carryless multiply instruction, then the cache can
-// be much more properly populated with actual IO data rather than our LUT
-// https://www.intel.com/content/dam/www/public/us/en/documents/white-papers/fast-crc-computation-generic-polynomials-pclmulqdq-paper.pdf
-// - Tue 30 Jun 2020 12:04:40 PM PDT
-constexpr std::array<std::array<std::uint32_t, 256>, 16>
-	CRC32Table(std::uint32_t Polynomial) noexcept
+constexpr CRC32TableT CRC32Table(std::uint32_t Polynomial) noexcept
 {
 	std::array<std::array<std::uint32_t, 256>, 16> Table = {};
 	// Generate main table
@@ -68,19 +61,34 @@ constexpr std::array<std::array<std::uint32_t, 256>, 16>
 	return Table;
 }
 
-#ifdef __AVX2__
-inline std::uint32_t _mm256_hxor_epi32(__m256i a)
+template<Polynomial Poly>
+struct CRC32TableStatic
 {
-	// Xor top half with bottom half
-	const __m128i XorReduce128 = _mm_xor_si128(
-		_mm256_extracti128_si256(a, 1), _mm256_castsi256_si128(a));
-	const std::uint64_t XorReduce64 = _mm_extract_epi64(XorReduce128, 1)
-									^ _mm_extract_epi64(XorReduce128, 0);
-	return XorReduce64 ^ (XorReduce64 >> 32);
-}
-#endif
+	const CRC32TableT& operator()() const
+	{
+		static constexpr CRC32TableT Table = CRC32Table(std::uint32_t(Poly));
+		return Table;
+	}
+};
 
-#ifdef __PCLMUL__
+static const CRC32TableT& GetCRC32Table(Polynomial Poly)
+{
+	switch( Poly )
+	{
+	default:
+	case Polynomial::CRC32:
+		return CRC32TableStatic<Polynomial::CRC32>()();
+	case Polynomial::CRC32C:
+		return CRC32TableStatic<Polynomial::CRC32C>()();
+	case Polynomial::CRC32K:
+		return CRC32TableStatic<Polynomial::CRC32K>()();
+	case Polynomial::CRC32K2:
+		return CRC32TableStatic<Polynomial::CRC32K2>()();
+	case Polynomial::CRC32Q:
+		return CRC32TableStatic<Polynomial::CRC32Q>()();
+	}
+}
+
 constexpr std::uint32_t BitReverse32(std::uint32_t Value)
 {
 	std::uint32_t Reversed = 0;
@@ -155,6 +163,7 @@ static_assert(KnConstant(      4, IEEEPOLY) == 0x1DB710640);
 static_assert(MuConstant(         IEEEPOLY) == 0x1F7011641);
 // clang-format on
 
+#ifdef __PCLMUL__
 template<std::uint32_t Polynomial>
 std::uint32_t
 	CRC32_PCLMULQDQ(std::span<const std::byte> Data, std::uint32_t CRC)
@@ -275,24 +284,111 @@ std::uint32_t
 }
 #endif
 
-template<std::uint32_t Polynomial>
-std::uint32_t
-	Checksum(std::span<const std::byte> Data, std::uint32_t InitialValue = 0u)
+#ifdef __AVX2__
+inline std::uint32_t _mm256_hxor_epi32(__m256i a)
 {
-	static constexpr auto Table = CRC32Table(Polynomial);
-	std::uint32_t         CRC   = ~InitialValue;
+	// Xor top half with bottom half
+	const __m128i XorReduce128 = _mm_xor_si128(
+		_mm256_extracti128_si256(a, 1), _mm256_castsi256_si128(a));
+	const std::uint64_t XorReduce64 = _mm_extract_epi64(XorReduce128, 1)
+									^ _mm_extract_epi64(XorReduce128, 0);
+	return XorReduce64 ^ (XorReduce64 >> 32);
+}
+#endif
+
+std::uint32_t Checksum(
+	std::span<const std::byte> Data, std::uint32_t InitialValue,
+	Polynomial Poly)
+{
+
+	const auto&   Table = GetCRC32Table(Poly);
+	std::uint32_t CRC   = ~InitialValue;
+
+#if defined(__ARM_FEATURE_CRC32)
+	if( Poly == Polynomial::CRC32 )
+	{
+		for( ; Data.size() / 8; )
+		{
+			const std::uint64_t Input64
+				= *reinterpret_cast<const std::uint64_t*>(Data.data());
+
+			CRC  = __crc32d(CRC, Input64);
+			Data = Data.subspan(sizeof(std::uint64_t));
+		}
+		for( ; Data.size() / 4; )
+		{
+			const std::uint32_t Input32
+				= *reinterpret_cast<const std::uint32_t*>(Data.data());
+
+			CRC  = __crc32w(CRC, Input32);
+			Data = Data.subspan(sizeof(std::uint32_t));
+		}
+		for( ; Data.size() / 2; )
+		{
+			const std::uint16_t Input16
+				= *reinterpret_cast<const std::uint16_t*>(Data.data());
+
+			CRC  = __crc32h(CRC, Input16);
+			Data = Data.subspan(sizeof(std::uint16_t));
+		}
+		for( ; Data.size(); )
+		{
+			const std::uint8_t Input8
+				= *reinterpret_cast<const std::uint8_t*>(Data.data());
+
+			CRC  = __crc32b(CRC, Input8);
+			Data = Data.subspan(sizeof(std::uint8_t));
+		}
+	}
+	else if( Poly == Polynomial::CRC32C )
+	{
+		for( ; Data.size() / 8; )
+		{
+			const std::uint64_t Input64
+				= *reinterpret_cast<const std::uint64_t*>(Data.data());
+
+			CRC  = __crc32cd(CRC, Input64);
+			Data = Data.subspan(sizeof(std::uint64_t));
+		}
+		for( ; Data.size() / 4; )
+		{
+			const std::uint32_t Input32
+				= *reinterpret_cast<const std::uint32_t*>(Data.data());
+
+			CRC  = __crc32cw(CRC, Input32);
+			Data = Data.subspan(sizeof(std::uint32_t));
+		}
+		for( ; Data.size() / 2; )
+		{
+			const std::uint16_t Input16
+				= *reinterpret_cast<const std::uint16_t*>(Data.data());
+
+			CRC  = __crc32ch(CRC, Input16);
+			Data = Data.subspan(sizeof(std::uint16_t));
+		}
+		for( ; Data.size(); )
+		{
+			const std::uint8_t Input8
+				= *reinterpret_cast<const std::uint8_t*>(Data.data());
+
+			CRC  = __crc32cb(CRC, Input8);
+			Data = Data.subspan(sizeof(std::uint8_t));
+		}
+	}
+#endif
 
 #ifdef __PCLMUL__
+	const std::uint32_t Polynomial32 = std::uint32_t(Poly);
 	if( Data.size() >= 64 )
 	{
 		if( Data.size() % 16 == 0 )
 		{
-			return ~CRC32_PCLMULQDQ<BitReverse32(Polynomial)>(Data, CRC);
+			return ~CRC32_PCLMULQDQ<BitReverse32(Polynomial32)>(Data, CRC);
 		}
 		else
 		{
-			CRC = CRC32_PCLMULQDQ<BitReverse32(Polynomial)>(Data, CRC);
-			return Checksum<Polynomial>(Data.last(Data.size() % 16), ~CRC);
+			CRC = CRC32_PCLMULQDQ<BitReverse32(Polynomial32)>(Data, CRC);
+			return Checksum<Polynomial32>(Data.last(Data.size() % 16), ~CRC);
 		}
 	}
 #endif
@@ -442,7 +538,7 @@ std::uint32_t
 
 	return ~std::accumulate(
 		Data.begin(), Data.end(), CRC,
-		[](std::uint32_t CurCRC, std::byte Byte) -> std::uint32_t {
+		[Table](std::uint32_t CurCRC, std::byte Byte) -> std::uint32_t {
 			return (CurCRC >> 8)
 				 ^ Table[0][std::uint8_t(CurCRC) ^ std::uint8_t(Byte)];
 		});

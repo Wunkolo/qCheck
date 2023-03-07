@@ -119,8 +119,26 @@ elseif( CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang" )
 	)
 endif()
 
+if( APPLE )
+	# Create Universal Binary
+	set( CMAKE_OSX_ARCHITECTURES "arm64;x86_64" )
+endif()
+
+add_library(
+	CRC
+	source/CRC/CRC32.cpp
+)
+target_include_directories(
+	CRC
+	INTERFACE
+		include
+	PRIVATE
+		include/CRC
+)
+
 add_executable(
 	qCheck
+	source/qCheck.cpp
 	source/main.cpp
 )
 
@@ -131,6 +149,7 @@ find_package(Threads REQUIRED)
 target_link_libraries(
 	qCheck
 	PRIVATE
+	CRC
 	Threads::Threads
 )
 target_include_directories(
@@ -156,6 +175,7 @@ add_executable(
 target_link_libraries(
 	CRC32_test
 	PRIVATE
+	CRC
 	Catch2::Catch2WithMain
 )
 target_include_directories(
