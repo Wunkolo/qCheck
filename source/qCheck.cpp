@@ -52,7 +52,7 @@ std::optional<std::uint32_t> ChecksumFile(const std::filesystem::path& Path)
 
 		madvise(FileMap, FileSize, MADV_SEQUENTIAL | MADV_WILLNEED);
 
-		CRC32 = CRC::Checksum<0xEDB88320u>(FileData);
+		CRC32 = CRC::Checksum(FileData);
 
 		munmap((void*)FileMap, FileSize);
 	}
@@ -63,8 +63,8 @@ std::optional<std::uint32_t> ChecksumFile(const std::filesystem::path& Path)
 		ssize_t ReadCount = read(FileHandle, Buffer.data(), Buffer.size());
 		while( ReadCount > 0 )
 		{
-			CRC32 = CRC::Checksum<0xEDB88320u>(
-				std::span(Buffer).subspan(0, ReadCount), CRC32);
+			CRC32
+				= CRC::Checksum(std::span(Buffer).subspan(0, ReadCount), CRC32);
 			ReadCount = read(FileHandle, Buffer.data(), Buffer.size());
 		}
 	}

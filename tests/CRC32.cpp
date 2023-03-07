@@ -12,7 +12,7 @@ TEST_CASE("Null bytes", "[CRC32]")
 	std::array<std::uint8_t, 0> Data;
 
 	const std::uint32_t Checksum
-		= CRC::Checksum<0xEDB88320u>(std::as_bytes(std::span{Data}));
+		= CRC::Checksum(std::as_bytes(std::span{Data}));
 	REQUIRE(Checksum == 0x00000000);
 }
 
@@ -22,7 +22,7 @@ TEST_CASE("IOTAx8 (byte)", "[CRC32]")
 	std::iota(Data.begin(), Data.end(), 0);
 
 	const std::uint32_t Checksum
-		= CRC::Checksum<0xEDB88320u>(std::as_bytes(std::span{Data}));
+		= CRC::Checksum(std::as_bytes(std::span{Data}));
 	REQUIRE(Checksum == 0x88AA689F);
 }
 
@@ -32,7 +32,7 @@ TEST_CASE("IOTAx16 (byte)", "[CRC32]")
 	std::iota(Data.begin(), Data.end(), 0);
 
 	const std::uint32_t Checksum
-		= CRC::Checksum<0xEDB88320u>(std::as_bytes(std::span{Data}));
+		= CRC::Checksum(std::as_bytes(std::span{Data}));
 	REQUIRE(Checksum == 0xCECEE288);
 }
 
@@ -42,7 +42,7 @@ TEST_CASE("IOTAx32 (byte)", "[CRC32]")
 	std::iota(Data.begin(), Data.end(), 0);
 
 	const std::uint32_t Checksum
-		= CRC::Checksum<0xEDB88320u>(std::as_bytes(std::span{Data}));
+		= CRC::Checksum(std::as_bytes(std::span{Data}));
 	REQUIRE(Checksum == 0x91267E8A);
 }
 
@@ -52,7 +52,7 @@ TEST_CASE("IOTAx64 (byte)", "[CRC32]")
 	std::iota(Data.begin(), Data.end(), 0);
 
 	const std::uint32_t Checksum
-		= CRC::Checksum<0xEDB88320u>(std::as_bytes(std::span{Data}));
+		= CRC::Checksum(std::as_bytes(std::span{Data}));
 	REQUIRE(Checksum == 0x100ECE8C);
 }
 
@@ -62,7 +62,7 @@ TEST_CASE("IOTAx128 (byte)", "[CRC32]")
 	std::iota(Data.begin(), Data.end(), 0);
 
 	const std::uint32_t Checksum
-		= CRC::Checksum<0xEDB88320u>(std::as_bytes(std::span{Data}));
+		= CRC::Checksum(std::as_bytes(std::span{Data}));
 	REQUIRE(Checksum == 0x24650D57);
 }
 
@@ -72,7 +72,7 @@ TEST_CASE("IOTAx256 (byte)", "[CRC32]")
 	std::iota(Data.begin(), Data.end(), 0);
 
 	const std::uint32_t Checksum
-		= CRC::Checksum<0xEDB88320u>(std::as_bytes(std::span{Data}));
+		= CRC::Checksum(std::as_bytes(std::span{Data}));
 	REQUIRE(Checksum == 0x29058C73);
 }
 
@@ -82,7 +82,7 @@ TEST_CASE("IOTAx512 (byte)", "[CRC32]")
 	std::iota(Data.begin(), Data.end(), 0);
 
 	const std::uint32_t Checksum
-		= CRC::Checksum<0xEDB88320u>(std::as_bytes(std::span{Data}));
+		= CRC::Checksum(std::as_bytes(std::span{Data}));
 	REQUIRE(Checksum == 0x1C613576);
 }
 
@@ -92,7 +92,7 @@ TEST_CASE("IOTAx1024 (byte)", "[CRC32]")
 	std::iota(Data.begin(), Data.end(), 0);
 
 	const std::uint32_t Checksum
-		= CRC::Checksum<0xEDB88320u>(std::as_bytes(std::span{Data}));
+		= CRC::Checksum(std::as_bytes(std::span{Data}));
 	REQUIRE(Checksum == 0xB70B4C26);
 }
 
@@ -102,7 +102,7 @@ TEST_CASE("\'penguin\'", "[CRC32]")
 	const auto Data     = std::string_view(String);
 
 	const std::uint32_t Checksum
-		= CRC::Checksum<0xEDB88320u>(std::as_bytes(std::span{Data}));
+		= CRC::Checksum(std::as_bytes(std::span{Data}));
 	REQUIRE(Checksum == 0x0E5C1A120);
 }
 
@@ -117,7 +117,7 @@ TEST_CASE("mt19937_32x1024", "[CRC32]")
 	}
 
 	const std::uint32_t Checksum
-		= CRC::Checksum<0xEDB88320u>(std::as_bytes(std::span{Data}));
+		= CRC::Checksum(std::as_bytes(std::span{Data}));
 	REQUIRE(Checksum == 0x25396D17);
 }
 
@@ -134,7 +134,7 @@ TEST_CASE("mt19937_32x1024", "[CRC32]")
 // 	}
 
 // 	const std::uint32_t Checksum
-// 		= CRC::Checksum<0xEDB88320u>(std::as_bytes(std::span{Data}));
+// 		= CRC::Checksum(std::as_bytes(std::span{Data}));
 // 	REQUIRE(Checksum == 0x46BD489B);
 // }
 
@@ -149,7 +149,7 @@ TEST_CASE("mt19937_32x797 (byte)", "[CRC32]")
 	}
 
 	const std::uint32_t Checksum
-		= CRC::Checksum<0xEDB88320u>(std::as_bytes(std::span{Data}));
+		= CRC::Checksum(std::as_bytes(std::span{Data}));
 	REQUIRE(Checksum == 0xB4B21120);
 }
 
@@ -164,7 +164,7 @@ TEST_CASE("mt19937_32x997 (byte)", "[CRC32]")
 	}
 
 	const std::uint32_t Checksum
-		= CRC::Checksum<0xEDB88320u>(std::as_bytes(std::span{Data}));
+		= CRC::Checksum(std::as_bytes(std::span{Data}));
 	REQUIRE(Checksum == 0x3D27DCE0);
 }
 
@@ -192,18 +192,18 @@ TEST_CASE("mt19937_32x1024x2 Combine", "[CRC32]")
 	}
 
 	const std::uint32_t ChecksumA
-		= CRC::Checksum<0xEDB88320u>(std::as_bytes(std::span{DataA}));
+		= CRC::Checksum(std::as_bytes(std::span{DataA}));
 	REQUIRE(ChecksumA == 0x25396D17);
 
 	const std::uint32_t ChecksumB
-		= CRC::Checksum<0xEDB88320u>(std::as_bytes(std::span{DataB}));
+		= CRC::Checksum(std::as_bytes(std::span{DataB}));
 	REQUIRE(ChecksumB == 0x2FBB546D);
 
 	const std::uint32_t ChecksumAB
-		= CRC::Checksum<0xEDB88320u>(std::as_bytes(std::span{DataAB}));
+		= CRC::Checksum(std::as_bytes(std::span{DataAB}));
 	REQUIRE(ChecksumAB == 0x2E0FE81B);
 
-	const std::uint32_t ChecksumABCombine = CRC::Checksum<0xEDB88320u>(
-		std::as_bytes(std::span{DataB}), ChecksumA);
+	const std::uint32_t ChecksumABCombine
+		= CRC::Checksum(std::as_bytes(std::span{DataB}), ChecksumA);
 	REQUIRE(ChecksumABCombine == 0x2E0FE81B);
 }
