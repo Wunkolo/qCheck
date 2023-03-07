@@ -19,7 +19,8 @@ const char* Usage
 	  "  -c, --check              Verify all input as .sfv files\n"
 	  "  -h, --help               Show this help message\n";
 
-std::optional<std::uint32_t> ChecksumFile(const std::filesystem::path& Path)
+static std::optional<std::uint32_t>
+	ChecksumFile(const std::filesystem::path& Path)
 {
 	std::uint32_t     CRC32 = 0;
 	std::error_code   CurError;
@@ -80,7 +81,7 @@ struct CheckEntry
 	std::uint32_t         Checksum;
 };
 
-void CheckerThread(
+static void CheckerThread(
 	std::atomic<std::size_t>& Passed, std::atomic<std::size_t>& QueueLock,
 	std::span<const CheckEntry> Checkqueue, std::size_t WorkerIndex)
 {
@@ -88,12 +89,14 @@ void CheckerThread(
 	char ThreadName[16] = {0};
 	std::snprintf(
 		ThreadName, std::size(ThreadName), "qCheckWkr: %4zu", WorkerIndex);
+
 #if defined(__APPLE__)
 	pthread_setname_np(ThreadName);
 #else
 	pthread_setname_np(pthread_self(), ThreadName);
 #endif
 #endif
+
 	while( true )
 	{
 		const std::size_t EntryIndex
@@ -126,7 +129,7 @@ void CheckerThread(
 	}
 }
 
-int Check(const Settings& CurSettings)
+int CheckSFV(const Settings& CurSettings)
 {
 	std::atomic<std::size_t> QueueLock{0};
 	std::vector<CheckEntry>  Checkqueue;
@@ -163,6 +166,7 @@ int Check(const Settings& CurSettings)
 				// Error parsing checksum value
 				continue;
 			}
+
 			std::filesystem::path FilePath;
 			if( CurSfvPath.has_parent_path() )
 			{
@@ -173,7 +177,7 @@ int Check(const Settings& CurSettings)
 				FilePath = ".";
 			}
 			FilePath /= PathString;
-			Checkqueue.push_back({FilePath, CheckValue});
+			Checkqueue.push_back(CheckEntry{FilePath, CheckValue});
 		}
 	}
 
@@ -193,4 +197,106 @@ int Check(const Settings& CurSettings)
 	}
 
 	return Checkqueue.size() == Passed.load() ? EXIT_SUCCESS : EXIT_FAILURE;
+}
+
+static void GenCheckThread(
+	std::atomic<std::size_t>&              FileIndex,
+	std::span<const std::filesystem::path> FileList, std::size_t WorkerIndex)
+{
+
+#ifdef _POSIX_VERSION
+	char ThreadName[16] = {0};
+	std::snprintf(
+		ThreadName, std::size(ThreadName), "qCheckWkr: %4zu", WorkerIndex);
+#if defined(__APPLE__)
+	pthread_setname_np(ThreadName);
+#else
+	pthread_setname_np(pthread_self(), ThreadName);
+#endif
+#endif
+
+	while( true )
+	{
+		const std::size_t EntryIndex = FileIndex.fetch_add(1);
+		if( EntryIndex >= FileList.size() )
+			return;
+		const std::filesystem::path&       CurPath = FileList[EntryIndex];
+		const std::optional<std::uint32_t> CRC32   = ChecksumFile(CurPath);
+		// If writing to a terminal, put some pretty colored output
+		if( CRC32.has_value() )
+		{
+			if( isatty(fileno(stdout)) )
+			{
+				std::fprintf(
+					stdout, "\e[36m%s\t\e[33m%08X\e[0m\n",
+					CurPath.filename().c_str(), CRC32.value());
+			}
+			else
+			{
+				std::fprintf(
+					stdout, "%s %08X\n", CurPath.filename().c_str(),
+					CRC32.value());
+			}
+		}
+		else
+		{
+			if( isatty(fileno(stdout)) )
+			{
+				std::fprintf(
+					stdout, "\e[36m%s\t\e[31mERROR\e[0m\n",
+					CurPath.filename().c_str());
+			}
+			else
+			{
+				std::fprintf(stdout, "%s ERROR\n", CurPath.filename().c_str());
+			}
+		}
+	}
+}
+
+int GenerateSFV(const Settings& CurSettings)
+{
+	// SFV Header
+	// https://en.wikipedia.org/wiki/Simple_file_verification
+
+	// Parse file list
+	std::fprintf(
+		stdout,
+		"; Generated with qCheck by Wunkolo [ Build: " __TIMESTAMP__ " ]\n");
+
+	for( const auto& CurPath : CurSettings.InputFiles )
+	{
+		std::error_code   CurError;
+		const std::size_t FileSize = std::filesystem::file_size(CurPath);
+
+		char        TimeString[64] = {0};
+		struct stat FileStat       = {};
+		if( stat(CurPath.c_str(), &FileStat) == 0 )
+		{
+			time_t FileTime = {};
+			FileTime        = FileStat.st_mtime;
+			std::strftime(
+				TimeString, std::extent_v<decltype(TimeString)>, "%F %T %Z",
+				std::localtime(&FileTime));
+		}
+		std::fprintf(
+			stdout, "; %.64s %zu %s\n", TimeString, FileSize,
+			CurPath.filename().c_str());
+	}
+
+	std::atomic<std::size_t> FileIndex(0);
+	std::vector<std::thread> Workers;
+
+	for( std::size_t i = 0; i < CurSettings.Threads; ++i )
+	{
+		Workers.push_back(std::thread(
+			&GenCheckThread, std::ref(FileIndex), CurSettings.InputFiles, i));
+	}
+
+	for( std::thread& Worker : Workers )
+	{
+		Worker.join();
+	}
+
+	return EXIT_SUCCESS;
 }

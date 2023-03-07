@@ -23,5 +23,5 @@ const static struct option CommandOptions[]
 	   {"help", no_argument, nullptr, 'h'},
 	   {nullptr, no_argument, nullptr, '\0'}};
 
-std::optional<std::uint32_t> ChecksumFile(const std::filesystem::path& Path);
-int                          Check(const Settings& CurSettings);
+int CheckSFV(const Settings& CurSettings);
+int GenerateSFV(const Settings& CurSettings);
