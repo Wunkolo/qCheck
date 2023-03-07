@@ -171,6 +171,7 @@ add_executable(
 target_link_libraries(
 	CRC32_test
 	PRIVATE
+	CRC
 	Catch2::Catch2WithMain
 )
 target_include_directories(
