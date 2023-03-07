@@ -1,5 +1,20 @@
 #include <CRC32.hpp>
 
+#if defined(__aarch64__)
+#include <arm_neon.h>
+
+#if !defined(ARMV8_OS_MACOS)
+#define __crc32d __builtin_arm_crc32d
+#define __crc32w __builtin_arm_crc32w
+#define __crc32h __builtin_arm_crc32h
+#define __crc32b __builtin_arm_crc32b
+#define __crc32cd __builtin_arm_crc32cd
+#define __crc32cw __builtin_arm_crc32cw
+#define __crc32ch __builtin_arm_crc32ch
+#define __crc32cb __builtin_arm_crc32cb
+#endif
+#endif
+
 namespace CRC
 {
 
@@ -74,19 +89,6 @@ static const CRC32TableT& GetCRC32Table(Polynomial Poly)
 	}
 }
 
-#ifdef __AVX2__
-inline std::uint32_t _mm256_hxor_epi32(__m256i a)
-{
-	// Xor top half with bottom half
-	const __m128i XorReduce128 = _mm_xor_si128(
-		_mm256_extracti128_si256(a, 1), _mm256_castsi256_si128(a));
-	const std::uint64_t XorReduce64 = _mm_extract_epi64(XorReduce128, 1)
-									^ _mm_extract_epi64(XorReduce128, 0);
-	return XorReduce64 ^ (XorReduce64 >> 32);
-}
-#endif
-
-#ifdef __PCLMUL__
 constexpr std::uint32_t BitReverse32(std::uint32_t Value)
 {
 	std::uint32_t Reversed = 0;
@@ -161,6 +163,7 @@ static_assert(KnConstant(      4, IEEEPOLY) == 0x1DB710640);
 static_assert(MuConstant(         IEEEPOLY) == 0x1F7011641);
 // clang-format on
 
+#ifdef __PCLMUL__
 template<std::uint32_t Polynomial>
 std::uint32_t
 	CRC32_PCLMULQDQ(std::span<const std::byte> Data, std::uint32_t CRC)
@@ -281,6 +284,18 @@ std::uint32_t
 }
 #endif
 
+#ifdef __AVX2__
+inline std::uint32_t _mm256_hxor_epi32(__m256i a)
+{
+	// Xor top half with bottom half
+	const __m128i XorReduce128 = _mm_xor_si128(
+		_mm256_extracti128_si256(a, 1), _mm256_castsi256_si128(a));
+	const std::uint64_t XorReduce64 = _mm_extract_epi64(XorReduce128, 1)
+									^ _mm_extract_epi64(XorReduce128, 0);
+	return XorReduce64 ^ (XorReduce64 >> 32);
+}
+#endif
+
 std::uint32_t Checksum(
 	std::span<const std::byte> Data, std::uint32_t InitialValue,
 	Polynomial Poly)
@@ -288,6 +303,79 @@ std::uint32_t Checksum(
 
 	const auto&   Table = GetCRC32Table(Poly);
 	std::uint32_t CRC   = ~InitialValue;
+
+#if defined(__ARM_FEATURE_CRC32)
+	if( Poly == Polynomial::CRC32 )
+	{
+		for( ; Data.size() / 8; )
+		{
+			const std::uint64_t Input64
+				= *reinterpret_cast<const std::uint64_t*>(Data.data());
+
+			CRC  = __crc32d(CRC, Input64);
+			Data = Data.subspan(sizeof(std::uint64_t));
+		}
+		for( ; Data.size() / 4; )
+		{
+			const std::uint32_t Input32
+				= *reinterpret_cast<const std::uint32_t*>(Data.data());
+
+			CRC  = __crc32w(CRC, Input32);
+			Data = Data.subspan(sizeof(std::uint32_t));
+		}
+		for( ; Data.size() / 2; )
+		{
+			const std::uint16_t Input16
+				= *reinterpret_cast<const std::uint16_t*>(Data.data());
+
+			CRC  = __crc32h(CRC, Input16);
+			Data = Data.subspan(sizeof(std::uint16_t));
+		}
+		for( ; Data.size(); )
+		{
+			const std::uint8_t Input8
+				= *reinterpret_cast<const std::uint8_t*>(Data.data());
+
+			CRC  = __crc32b(CRC, Input8);
+			Data = Data.subspan(sizeof(std::uint8_t));
+		}
+	}
+	else if( Poly == Polynomial::CRC32C )
+	{
+		for( ; Data.size() / 8; )
+		{
+			const std::uint64_t Input64
+				= *reinterpret_cast<const std::uint64_t*>(Data.data());
+
+			CRC  = __crc32cd(CRC, Input64);
+			Data = Data.subspan(sizeof(std::uint64_t));
+		}
+		for( ; Data.size() / 4; )
+		{
+			const std::uint32_t Input32
+				= *reinterpret_cast<const std::uint32_t*>(Data.data());
+
+			CRC  = __crc32cw(CRC, Input32);
+			Data = Data.subspan(sizeof(std::uint32_t));
+		}
+		for( ; Data.size() / 2; )
+		{
+			const std::uint16_t Input16
+				= *reinterpret_cast<const std::uint16_t*>(Data.data());
+
+			CRC  = __crc32ch(CRC, Input16);
+			Data = Data.subspan(sizeof(std::uint16_t));
+		}
+		for( ; Data.size(); )
+		{
+			const std::uint8_t Input8
+				= *reinterpret_cast<const std::uint8_t*>(Data.data());
+
+			CRC  = __crc32cb(CRC, Input8);
+			Data = Data.subspan(sizeof(std::uint8_t));
+		}
+	}
+#endif
 
 #ifdef __PCLMUL__
 	const std::uint32_t Polynomial32 = std::uint32_t(Poly);
