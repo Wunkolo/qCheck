@@ -74,13 +74,60 @@ std::optional<std::uint32_t> ChecksumFile(const std::filesystem::path& Path)
 	return CRC32;
 }
 
+struct CheckEntry
+{
+	std::filesystem::path FilePath;
+	std::uint32_t         Checksum;
+};
+
+void CheckerThread(
+	std::atomic<std::size_t>& Passed, std::atomic<std::size_t>& QueueLock,
+	std::span<const CheckEntry> Checkqueue, std::size_t WorkerIndex)
+{
+#ifdef _POSIX_VERSION
+	char ThreadName[16] = {0};
+	std::snprintf(
+		ThreadName, std::size(ThreadName), "qCheckWkr: %4zu", WorkerIndex);
+#if defined(__APPLE__)
+	pthread_setname_np(ThreadName);
+#else
+	pthread_setname_np(pthread_self(), ThreadName);
+#endif
+#endif
+	while( true )
+	{
+		const std::size_t EntryIndex
+			= QueueLock.fetch_add(1, std::memory_order_relaxed);
+		if( EntryIndex >= Checkqueue.size() )
+			return;
+		const CheckEntry& CurEntry = Checkqueue[EntryIndex];
+
+		const std::optional<std::uint32_t> CurSum
+			= ChecksumFile(CurEntry.FilePath);
+
+		if( CurSum.has_value() )
+		{
+			const bool Valid = CurEntry.Checksum == CurSum;
+			std::printf(
+				"\e[36m%s\t\e[33m%08X\e[37m...%s%08X\t%s\e[0m\n",
+				CurEntry.FilePath.c_str(), CurEntry.Checksum,
+				Valid ? "\e[32m" : "\e[31m", CurSum.value(),
+				Valid ? "\e[32mOK" : "\e[31mFAIL");
+
+			Passed.fetch_add(Valid, std::memory_order_relaxed);
+		}
+		else
+		{
+			std::printf(
+				"\e[36m%s\t\e[33m%08X\t\t\e[31mError opening "
+				"file\n",
+				CurEntry.FilePath.c_str(), CurEntry.Checksum);
+		}
+	}
+}
+
 int Check(const Settings& CurSettings)
 {
-	struct CheckEntry
-	{
-		std::filesystem::path FilePath;
-		std::uint32_t         Checksum;
-	};
 	std::atomic<std::size_t> QueueLock{0};
 	std::vector<CheckEntry>  Checkqueue;
 
@@ -136,54 +183,14 @@ int Check(const Settings& CurSettings)
 	for( std::size_t i = 0; i < CurSettings.Threads; ++i )
 	{
 		Workers.push_back(std::thread(
-			[&Passed, &QueueLock,
-			 &Checkqueue = std::as_const(Checkqueue)](std::size_t WorkerIndex) {
-#ifdef _POSIX_VERSION
-				char ThreadName[16] = {0};
-				std::snprintf(
-					ThreadName, std::size(ThreadName), "qCheckWkr: %4zu",
-					WorkerIndex);
-#if defined(__APPLE__)
-				pthread_setname_np(ThreadName);
-#else
-				pthread_setname_np(pthread_self(), ThreadName);
-#endif
-#endif
-				while( true )
-				{
-					const std::size_t EntryIndex = QueueLock.fetch_add(1);
-					if( EntryIndex >= Checkqueue.size() )
-						return;
-					const CheckEntry& CurEntry = Checkqueue[EntryIndex];
-
-					const std::optional<std::uint32_t> CurSum
-						= ChecksumFile(CurEntry.FilePath);
-
-					if( CurSum.has_value() )
-					{
-						const bool Valid = CurEntry.Checksum == CurSum;
-						std::printf(
-							"\e[36m%s\t\e[33m%08X\e[37m...%s%08X\t%s\e[0m\n",
-							CurEntry.FilePath.c_str(), CurEntry.Checksum,
-							Valid ? "\e[32m" : "\e[31m", CurSum.value(),
-							Valid ? "\e[32mOK" : "\e[31mFAIL");
-						if( Valid )
-							Passed.fetch_add(1);
-					}
-					else
-					{
-						std::printf(
-							"\e[36m%s\t\e[33m%08X\t\t\e[31mError opening "
-							"file\n",
-							CurEntry.FilePath.c_str(), CurEntry.Checksum);
-					}
-				}
-			},
-			i));
+			CheckerThread, std::ref(Passed), std::ref(QueueLock),
+			std::span(Checkqueue), i));
 	}
 
-	for( std::size_t i = 0; i < CurSettings.Threads; ++i )
-		Workers[i].join();
+	for( std::thread& Worker : Workers )
+	{
+		Worker.join();
+	}
 
 	return Checkqueue.size() == Passed.load() ? EXIT_SUCCESS : EXIT_FAILURE;
 }
