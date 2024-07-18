@@ -121,7 +121,7 @@ endif()
 
 if( APPLE )
 	# Create Universal Binary
-	set( CMAKE_OSX_ARCHITECTURES "arm64;x86_64" )
+	# set( CMAKE_OSX_ARCHITECTURES "arm64;x86_64" )
 endif()
 
 add_library(
