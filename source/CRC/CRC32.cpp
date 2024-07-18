@@ -293,19 +293,25 @@ std::uint32_t
 //  pmull_p64<1,0> = _mm_clmulepi64_si128(..., ..., 0b0001'0000)
 //  pmull_p64<1,1> = _mm_clmulepi64_si128(..., ..., 0b0001'0001)
 template<std::size_t LaneB, std::size_t LaneA>
-inline poly64x2_t pmull_p64(const poly64x2_t A, const poly64x2_t B)
+inline poly64x2_t pmull_p64(const poly64x2_t OpA, const poly64x2_t OpB)
 {
 	return (poly64x2_t)vmull_p64(
-		vgetq_lane_u64(A, LaneA), vgetq_lane_u64(B, LaneB));
+		vgetq_lane_u64(OpA, LaneA), vgetq_lane_u64(OpB, LaneB));
+}
+
+template<>
+inline poly64x2_t pmull_p64<1, 1>(const poly64x2_t OpA, const poly64x2_t OpB)
+{
+	return (poly64x2_t)vmull_high_p64(OpA, OpB);
 }
 
 inline poly64x2_t
-	eor3_p64(const poly64x2_t A, const poly64x2_t B, const poly64x2_t C)
+	eor3_p64(const poly64x2_t OpA, const poly64x2_t OpB, const poly64x2_t OpC)
 {
 #if defined(__ARM_FEATURE_SHA3)
-	return veor3q_u64(A, B, C);
+	return veor3q_u64(OpA, OpB, OpC);
 #else
-	return veorq_u64(A, veorq_u64(B, C));
+	return veorq_u64(OpA, veorq_u64(OpB, OpC));
 #endif
 }
 
