@@ -126,7 +126,8 @@ endif()
 
 add_library(
 	CRC
-	source/CRC/CRC32.cpp
+	source/CRC/CRC32-x64.cpp
+	source/CRC/CRC32-a64.cpp
 )
 target_include_directories(
 	CRC
