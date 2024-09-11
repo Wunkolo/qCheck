@@ -5,6 +5,7 @@
 #include <span>
 #include <string_view>
 
+#include <catch2/benchmark/catch_benchmark.hpp>
 #include <catch2/catch_test_macros.hpp>
 
 TEST_CASE("Null bytes", "[CRC32]")
@@ -206,4 +207,47 @@ TEST_CASE("mt19937_32x1024x2 Combine", "[CRC32]")
 	const std::uint32_t ChecksumABCombine
 		= CRC::Checksum(std::as_bytes(std::span{DataB}), ChecksumA);
 	REQUIRE(ChecksumABCombine == 0x2E0FE81B);
+}
+
+TEST_CASE("Benchmarks", "[CRC32]")
+{
+	BENCHMARK_ADVANCED("1024")(Catch::Benchmark::Chronometer meter)
+	{
+		std::vector<std::uint32_t> Data(1024);
+		meter.measure([&Data]() {
+			return CRC::Checksum(std::as_bytes(std::span{Data}));
+		});
+	};
+
+	BENCHMARK_ADVANCED("2048")(Catch::Benchmark::Chronometer meter)
+	{
+		std::vector<std::uint32_t> Data(2048);
+		meter.measure([&Data]() {
+			return CRC::Checksum(std::as_bytes(std::span{Data}));
+		});
+	};
+
+	BENCHMARK_ADVANCED("4096")(Catch::Benchmark::Chronometer meter)
+	{
+		std::vector<std::uint32_t> Data(4096);
+		meter.measure([&Data]() {
+			return CRC::Checksum(std::as_bytes(std::span{Data}));
+		});
+	};
+
+	BENCHMARK_ADVANCED("1MiB")(Catch::Benchmark::Chronometer meter)
+	{
+		std::vector<std::uint32_t> Data(1024ULL * 1024);
+		meter.measure([&Data]() {
+			return CRC::Checksum(std::as_bytes(std::span{Data}));
+		});
+	};
+
+	BENCHMARK_ADVANCED("10MiB")(Catch::Benchmark::Chronometer meter)
+	{
+		std::vector<std::uint32_t> Data(1024ULL * 1024 * 10);
+		meter.measure([&Data]() {
+			return CRC::Checksum(std::as_bytes(std::span{Data}));
+		});
+	};
 }
