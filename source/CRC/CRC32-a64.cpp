@@ -195,7 +195,8 @@ inline poly64x2_t
 template<std::uint32_t Polynomial>
 std::uint32_t CRC32_PMULL(std::span<const std::byte> Data, std::uint32_t CRC)
 {
-	poly64x2x4_t CRCVec = reinterpret_cast<const poly64x2x4_t*>(Data.data())[0];
+	poly64x2x4_t CRCVec
+		= vld1q_p64_x4(reinterpret_cast<const poly64_t*>(Data.data()));
 
 	Data = Data.subspan(64);
 
@@ -221,7 +222,7 @@ std::uint32_t CRC32_PMULL(std::span<const std::byte> Data, std::uint32_t CRC)
 		const poly64x2_t MulHi3 = pmull_p64<1, 1>(CRCVec.val[3], K1K2);
 
 		const poly64x2x4_t Load
-			= reinterpret_cast<const poly64x2x4_t*>(Data.data())[0];
+			= vld1q_p64_x4(reinterpret_cast<const poly64_t*>(Data.data()));
 
 		CRCVec.val[0] = eor3_p64(MulHi0, MulLo0, Load.val[0]);
 		CRCVec.val[1] = eor3_p64(MulHi1, MulLo1, Load.val[1]);
@@ -260,7 +261,7 @@ std::uint32_t CRC32_PMULL(std::span<const std::byte> Data, std::uint32_t CRC)
 	for( ; Data.size() >= 16; Data = Data.subspan(16) )
 	{
 		const poly64x2_t Load
-			= *reinterpret_cast<const poly64x2_t*>(Data.data());
+			= vld1q_p64(reinterpret_cast<const poly64_t*>(Data.data()));
 
 		const poly64x2_t MulLo = pmull_p64<0, 0>(CRCVec.val[0], K3K4);
 		const poly64x2_t MulHi = pmull_p64<1, 1>(CRCVec.val[0], K3K4);
