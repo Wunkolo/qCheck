@@ -269,7 +269,7 @@ std::uint32_t CRC32_PMULL(std::span<const std::byte> Data, std::uint32_t CRC)
 	}
 
 	// Reduce 128 to 64
-	static const uint64x2_t Zero = vdupq_n_u64(0);
+	const uint64x2_t Zero = vdupq_n_u64(0);
 	{
 		const poly64x2_t MulHiLo = pmull_p64<1, 0>(CRCVec.val[0], K3K4);
 
