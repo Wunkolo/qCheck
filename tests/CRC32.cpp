@@ -122,22 +122,20 @@ TEST_CASE("mt19937_32x1024", "[CRC32]")
 	REQUIRE(Checksum == 0x25396D17);
 }
 
-// This seems to produce different results between debug/release...
-// Tue Oct  4 06:45:55 PM PDT 2022
-// TEST_CASE("mt19937_64x1024", "[CRC32]")
-// {
-// 	std::mt19937_64 MersenneTwister;
+TEST_CASE("mt19937_64x1024", "[CRC32]")
+{
+	std::mt19937_64 MersenneTwister;
 
-// 	std::array<std::uint64_t, 1024> Data = {};
-// 	for( auto& CurValue : Data )
-// 	{
-// 		CurValue = MersenneTwister();
-// 	}
+	std::array<std::uint64_t, 1024> Data = {};
+	for( auto& CurValue : Data )
+	{
+		CurValue = MersenneTwister();
+	}
 
-// 	const std::uint32_t Checksum
-// 		= CRC::Checksum(std::as_bytes(std::span{Data}));
-// 	REQUIRE(Checksum == 0x46BD489B);
-// }
+	const std::uint32_t Checksum
+		= CRC::Checksum(std::as_bytes(std::span{Data}));
+	REQUIRE(Checksum == 0x5fea271c);
+}
 
 TEST_CASE("mt19937_32x797 (byte)", "[CRC32]")
 {
