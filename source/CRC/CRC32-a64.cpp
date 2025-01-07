@@ -269,11 +269,11 @@ std::uint32_t CRC32_PMULL(std::span<const std::byte> Data, std::uint32_t CRC)
 	}
 
 	// Reduce 128 to 64
-	static const poly64x2_t Lo32Mask64 = vdupq_n_p64(0xFFFFFFFF);
+	static const uint64x2_t Zero = vdupq_n_u64(0);
 	{
 		const poly64x2_t MulHiLo = pmull_p64<1, 0>(CRCVec.val[0], K3K4);
 
-		const poly64x2_t Upper64 = vextq_s8(CRCVec.val[0], vdupq_n_s8(0), 8);
+		const poly64x2_t Upper64 = vextq_s8(CRCVec.val[0], Zero, 8);
 
 		CRCVec.val[0] = veorq_u64(Upper64, MulHiLo);
 
@@ -282,9 +282,8 @@ std::uint32_t CRC32_PMULL(std::span<const std::byte> Data, std::uint32_t CRC)
 			0ull,
 		};
 
-		const poly64x2_t Upper96 = vextq_s8(CRCVec.val[0], vdupq_n_s8(0), 4);
-
-		const poly64x2_t Trunc32 = vandq_u64(CRCVec.val[0], Lo32Mask64);
+		const poly64x2_t Upper96 = vextq_s8(CRCVec.val[0], Zero, 4);
+		const poly64x2_t Trunc32 = vsliq_n_u64(CRCVec.val[0], Zero, 32);
 
 		const poly64x2_t MulLo = pmull_p64<0, 0>(Trunc32, K5K0);
 
@@ -298,11 +297,11 @@ std::uint32_t CRC32_PMULL(std::span<const std::byte> Data, std::uint32_t CRC)
 			MuConstant(Polynomial),
 		};
 
-		poly64x2_t Trunc32 = vandq_u64(CRCVec.val[0], Lo32Mask64);
+		poly64x2_t Trunc32 = vsliq_n_u64(CRCVec.val[0], Zero, 32);
 
 		const poly64x2_t MulHiLo = pmull_p64<1, 0>(Trunc32, Poly);
 
-		Trunc32                = vandq_u64(MulHiLo, Lo32Mask64);
+		Trunc32                = vsliq_n_u64(MulHiLo, Zero, 32);
 		const poly64x2_t MulLo = pmull_p64<0, 0>(Trunc32, Poly);
 
 		CRCVec.val[0] = veorq_u64(CRCVec.val[0], MulLo);
