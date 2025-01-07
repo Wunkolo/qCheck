@@ -185,4 +185,8 @@ target_include_directories(
 	include
 )
 
+include(CTest)
+include(Catch)
+
 add_test(CRC32_test CRC32_test)
+catch_discover_tests(CRC32_test)
