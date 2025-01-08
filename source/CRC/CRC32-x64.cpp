@@ -291,18 +291,22 @@ std::uint32_t Checksum(
 	const auto&   Table = GetCRC32Table(Poly);
 	std::uint32_t CRC   = ~InitialValue;
 
-#ifdef __PCLMUL__
-	const std::uint32_t Polynomial32 = std::uint32_t(Poly);
-	if( Data.size() >= 64 )
+#if defined(__PCLMUL__)
+	if( Poly == Polynomial::CRC32 )
 	{
-		if( Data.size() % 16 == 0 )
+		if( Data.size() >= 64 )
 		{
-			return ~CRC32_PCLMULQDQ<BitReverse32(Polynomial32)>(Data, CRC);
-		}
-		else
-		{
-			CRC = CRC32_PCLMULQDQ<BitReverse32(Polynomial32)>(Data, CRC);
-			return Checksum<Polynomial32>(Data.last(Data.size() % 16), ~CRC);
+			if( Data.size() % 16 == 0 )
+			{
+				return ~CRC32_PCLMULQDQ<BitReverse32(
+					std::uint32_t(Polynomial::CRC32))>(Data, CRC);
+			}
+			else
+			{
+				CRC = CRC32_PCLMULQDQ<BitReverse32(
+					std::uint32_t(Polynomial::CRC32))>(Data, CRC);
+				return Checksum(Data.last(Data.size() % 16), ~CRC);
+			}
 		}
 	}
 #endif
