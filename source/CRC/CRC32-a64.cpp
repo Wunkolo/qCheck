@@ -89,7 +89,7 @@ static const CRC32TableT& GetCRC32Table(Polynomial Poly)
 	}
 }
 
-constexpr std::uint32_t BitReverse32(std::uint32_t Value)
+consteval std::uint32_t BitReverse32(std::uint32_t Value)
 {
 	std::uint32_t Reversed = 0;
 	for( std::uint32_t BitIndex = 0u; BitIndex < 32u; ++BitIndex )
@@ -101,7 +101,7 @@ constexpr std::uint32_t BitReverse32(std::uint32_t Value)
 }
 
 // BitReverse(x^(shift) mod P(x) << 32) << 1
-constexpr std::uint64_t
+consteval std::uint64_t
 	KnConstant(std::uint32_t ByteShift, std::uint32_t Polynomial)
 {
 	std::uint32_t Remainder = 1u << 24;
@@ -125,7 +125,7 @@ constexpr std::uint64_t
 }
 
 // BitReverse(x^64 / P(x)) << 1
-constexpr std::uint64_t MuConstant(uint32_t Polynomial)
+consteval std::uint64_t MuConstant(uint32_t Polynomial)
 {
 	std::uint32_t Remainder = 1u << 24;
 	std::uint32_t Quotient  = 0u;
@@ -206,7 +206,7 @@ std::uint32_t CRC32_PMULL(std::span<const std::byte> Data, std::uint32_t CRC)
 	// Fold 512 bits at a time
 	for( ; Data.size() >= 64; Data = Data.subspan(64) )
 	{
-		static const poly64x2_t K1K2 = poly64x2_t{
+		const poly64x2_t K1K2 = poly64x2_t{
 			KnConstant(64 + 4, Polynomial),
 			KnConstant(64 - 4, Polynomial),
 		};
@@ -231,7 +231,7 @@ std::uint32_t CRC32_PMULL(std::span<const std::byte> Data, std::uint32_t CRC)
 	}
 
 	// Reduce 512 to 128
-	static const poly64x2_t K3K4 = poly64x2_t{
+	const poly64x2_t K3K4 = poly64x2_t{
 		KnConstant(16 + 4, Polynomial),
 		KnConstant(16 - 4, Polynomial),
 	};
@@ -277,7 +277,7 @@ std::uint32_t CRC32_PMULL(std::span<const std::byte> Data, std::uint32_t CRC)
 
 		CRCVec.val[0] = veorq_u64(Upper64, MulHiLo);
 
-		static const poly64x2_t K5K0 = poly64x2_t{
+		const poly64x2_t K5K0 = poly64x2_t{
 			KnConstant(8, Polynomial),
 			0ull,
 		};
@@ -292,7 +292,7 @@ std::uint32_t CRC32_PMULL(std::span<const std::byte> Data, std::uint32_t CRC)
 
 	// Reduce 64 to 32
 	{
-		static const poly64x2_t Poly = poly64x2_t{
+		const poly64x2_t Poly = poly64x2_t{
 			KnConstant(4, Polynomial) | 1,
 			MuConstant(Polynomial),
 		};
@@ -320,7 +320,6 @@ std::uint32_t Checksum(
 
 	if( Poly == Polynomial::CRC32 )
 	{
-		const std::uint32_t Polynomial32 = std::uint32_t(Poly);
 		if( Data.size() >= 64 )
 		{
 			if( Data.size() % 16 == 0 )

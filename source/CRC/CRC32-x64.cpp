@@ -76,7 +76,7 @@ static const CRC32TableT& GetCRC32Table(Polynomial Poly)
 	}
 }
 
-constexpr std::uint32_t BitReverse32(std::uint32_t Value)
+consteval std::uint32_t BitReverse32(std::uint32_t Value)
 {
 	std::uint32_t Reversed = 0;
 	for( std::uint32_t BitIndex = 0u; BitIndex < 32u; ++BitIndex )
@@ -88,7 +88,7 @@ constexpr std::uint32_t BitReverse32(std::uint32_t Value)
 }
 
 // BitReverse(x^(shift) mod P(x) << 32) << 1
-constexpr std::uint64_t
+consteval std::uint64_t
 	KnConstant(std::uint32_t ByteShift, std::uint32_t Polynomial)
 {
 	std::uint32_t Remainder = 1u << 24;
@@ -112,7 +112,7 @@ constexpr std::uint64_t
 }
 
 // BitReverse(x^64 / P(x)) << 1
-constexpr std::uint64_t MuConstant(uint32_t Polynomial)
+consteval std::uint64_t MuConstant(uint32_t Polynomial)
 {
 	std::uint32_t Remainder = 1u << 24;
 	std::uint32_t Quotient  = 0u;
@@ -173,7 +173,7 @@ std::uint32_t
 	// Todo: VPCLMULQDQ(AVX2, AVX512)
 	for( ; Data.size() >= 64; Data = Data.subspan(64) )
 	{
-		static const __m128i K1K2 = _mm_set_epi64x(
+		const __m128i K1K2 = _mm_set_epi64x(
 			KnConstant(64 - 4, Polynomial), KnConstant(64 + 4, Polynomial));
 
 		const __m128i MulLo0 = _mm_clmulepi64_si128(CRCVec0, K1K2, 0b0000'0000);
@@ -202,7 +202,7 @@ std::uint32_t
 	}
 
 	// Reduce 512 to 128
-	static const __m128i K3K4 = _mm_set_epi64x(
+	const __m128i K3K4 = _mm_set_epi64x(
 		KnConstant(16 - 4, Polynomial), KnConstant(16 + 4, Polynomial));
 
 	// Reduce Vec1 into Vec0
@@ -239,7 +239,7 @@ std::uint32_t
 	}
 
 	// Reduce 128 to 64
-	static const __m128i Lo32Mask64 = _mm_set1_epi64x(0xFFFFFFFF);
+	const __m128i Lo32Mask64 = _mm_set1_epi64x(0xFFFFFFFF);
 	{
 		const __m128i MulHiLo
 			= _mm_clmulepi64_si128(CRCVec0, K3K4, 0b0001'0000);
@@ -248,8 +248,7 @@ std::uint32_t
 
 		CRCVec0 = _mm_xor_si128(Upper64, MulHiLo);
 
-		static const __m128i K5K0
-			= _mm_cvtsi64_si128(KnConstant(8, Polynomial));
+		const __m128i K5K0 = _mm_cvtsi64_si128(KnConstant(8, Polynomial));
 
 		const __m128i Upper96 = _mm_srli_si128(CRCVec0, 4);
 
@@ -262,7 +261,7 @@ std::uint32_t
 
 	// Reduce 64 to 32
 	{
-		static const __m128i Poly = _mm_set_epi64x(
+		const __m128i Poly = _mm_set_epi64x(
 			MuConstant(Polynomial), KnConstant(4, Polynomial) | 1);
 
 		__m128i Trunc32 = _mm_and_si128(CRCVec0, Lo32Mask64);
