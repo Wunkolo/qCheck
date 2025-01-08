@@ -321,22 +321,22 @@ std::uint32_t Checksum(
 			~0, ~0, ~0, 2, ~0, ~0, ~0, 1, ~0, ~0, ~0, 0);
 		// Offset into the multi-dimensional array
 		const __m512i ArrayOffset = _mm512_set_epi32(
-			(sizeof(typename decltype(Table)::value_type) / 4) * 0,
-			(sizeof(typename decltype(Table)::value_type) / 4) * 1,
-			(sizeof(typename decltype(Table)::value_type) / 4) * 2,
-			(sizeof(typename decltype(Table)::value_type) / 4) * 3,
-			(sizeof(typename decltype(Table)::value_type) / 4) * 4,
-			(sizeof(typename decltype(Table)::value_type) / 4) * 5,
-			(sizeof(typename decltype(Table)::value_type) / 4) * 6,
-			(sizeof(typename decltype(Table)::value_type) / 4) * 7,
-			(sizeof(typename decltype(Table)::value_type) / 4) * 8,
-			(sizeof(typename decltype(Table)::value_type) / 4) * 9,
-			(sizeof(typename decltype(Table)::value_type) / 4) * 10,
-			(sizeof(typename decltype(Table)::value_type) / 4) * 11,
-			(sizeof(typename decltype(Table)::value_type) / 4) * 12,
-			(sizeof(typename decltype(Table)::value_type) / 4) * 13,
-			(sizeof(typename decltype(Table)::value_type) / 4) * 14,
-			(sizeof(typename decltype(Table)::value_type) / 4) * 15);
+			(sizeof(CRC32TableT::value_type) / 4) * 0,
+			(sizeof(CRC32TableT::value_type) / 4) * 1,
+			(sizeof(CRC32TableT::value_type) / 4) * 2,
+			(sizeof(CRC32TableT::value_type) / 4) * 3,
+			(sizeof(CRC32TableT::value_type) / 4) * 4,
+			(sizeof(CRC32TableT::value_type) / 4) * 5,
+			(sizeof(CRC32TableT::value_type) / 4) * 6,
+			(sizeof(CRC32TableT::value_type) / 4) * 7,
+			(sizeof(CRC32TableT::value_type) / 4) * 8,
+			(sizeof(CRC32TableT::value_type) / 4) * 9,
+			(sizeof(CRC32TableT::value_type) / 4) * 10,
+			(sizeof(CRC32TableT::value_type) / 4) * 11,
+			(sizeof(CRC32TableT::value_type) / 4) * 12,
+			(sizeof(CRC32TableT::value_type) / 4) * 13,
+			(sizeof(CRC32TableT::value_type) / 4) * 14,
+			(sizeof(CRC32TableT::value_type) / 4) * 15);
 		for( ; Data.size() / 16; )
 		{
 			// Load in 8 bytes
@@ -408,14 +408,14 @@ std::uint32_t Checksum(
 			~0, 3, ~0, ~0, ~0, 2, ~0, ~0, ~0, 1, ~0, ~0, ~0, 0);
 		// Offset into the multi-dimensional array
 		const __m256i ArrayOffset = _mm256_set_epi32(
-			(sizeof(typename decltype(Table)::value_type) / 4) * 0,
-			(sizeof(typename decltype(Table)::value_type) / 4) * 1,
-			(sizeof(typename decltype(Table)::value_type) / 4) * 2,
-			(sizeof(typename decltype(Table)::value_type) / 4) * 3,
-			(sizeof(typename decltype(Table)::value_type) / 4) * 4,
-			(sizeof(typename decltype(Table)::value_type) / 4) * 5,
-			(sizeof(typename decltype(Table)::value_type) / 4) * 6,
-			(sizeof(typename decltype(Table)::value_type) / 4) * 7);
+			(sizeof(CRC32TableT::value_type) / 4) * 0,
+			(sizeof(CRC32TableT::value_type) / 4) * 1,
+			(sizeof(CRC32TableT::value_type) / 4) * 2,
+			(sizeof(CRC32TableT::value_type) / 4) * 3,
+			(sizeof(CRC32TableT::value_type) / 4) * 4,
+			(sizeof(CRC32TableT::value_type) / 4) * 5,
+			(sizeof(CRC32TableT::value_type) / 4) * 6,
+			(sizeof(CRC32TableT::value_type) / 4) * 7);
 		for( ; Data.size() / 8; Data.subspan(8) )
 		{
 			// Load in 8 bytes
