@@ -156,10 +156,14 @@ std::uint32_t
 	CRC32_PCLMULQDQ(std::span<const std::byte> Data, std::uint32_t CRC)
 {
 
-	__m128i CRCVec0 = reinterpret_cast<const __m128i*>(Data.data())[0];
-	__m128i CRCVec1 = reinterpret_cast<const __m128i*>(Data.data())[1];
-	__m128i CRCVec2 = reinterpret_cast<const __m128i*>(Data.data())[2];
-	__m128i CRCVec3 = reinterpret_cast<const __m128i*>(Data.data())[3];
+	__m128i CRCVec0
+		= _mm_loadu_si128(&reinterpret_cast<const __m128i*>(Data.data())[0]);
+	__m128i CRCVec1
+		= _mm_loadu_si128(&reinterpret_cast<const __m128i*>(Data.data())[1]);
+	__m128i CRCVec2
+		= _mm_loadu_si128(&reinterpret_cast<const __m128i*>(Data.data())[2]);
+	__m128i CRCVec3
+		= _mm_loadu_si128(&reinterpret_cast<const __m128i*>(Data.data())[3]);
 
 	Data = Data.subspan(64);
 
@@ -182,10 +186,14 @@ std::uint32_t
 		const __m128i MulHi2 = _mm_clmulepi64_si128(CRCVec2, K1K2, 0b0001'0001);
 		const __m128i MulHi3 = _mm_clmulepi64_si128(CRCVec3, K1K2, 0b0001'0001);
 
-		const __m128i Load0 = reinterpret_cast<const __m128i*>(Data.data())[0];
-		const __m128i Load1 = reinterpret_cast<const __m128i*>(Data.data())[1];
-		const __m128i Load2 = reinterpret_cast<const __m128i*>(Data.data())[2];
-		const __m128i Load3 = reinterpret_cast<const __m128i*>(Data.data())[3];
+		const __m128i Load0 = _mm_loadu_si128(
+			&reinterpret_cast<const __m128i*>(Data.data())[0]);
+		const __m128i Load1 = _mm_loadu_si128(
+			&reinterpret_cast<const __m128i*>(Data.data())[1]);
+		const __m128i Load2 = _mm_loadu_si128(
+			&reinterpret_cast<const __m128i*>(Data.data())[2]);
+		const __m128i Load3 = _mm_loadu_si128(
+			&reinterpret_cast<const __m128i*>(Data.data())[3]);
 
 		CRCVec0 = _mm_xor_si128(_mm_xor_si128(MulHi0, MulLo0), Load0);
 		CRCVec1 = _mm_xor_si128(_mm_xor_si128(MulHi1, MulLo1), Load1);
@@ -221,7 +229,8 @@ std::uint32_t
 	// Fold 128 bits at a time
 	for( ; Data.size() >= 16; Data = Data.subspan(16) )
 	{
-		const __m128i Load = *reinterpret_cast<const __m128i*>(Data.data());
+		const __m128i Load
+			= _mm_loadu_si128(reinterpret_cast<const __m128i*>(Data.data()));
 
 		const __m128i MulLo = _mm_clmulepi64_si128(CRCVec0, K3K4, 0b0000'0000);
 		const __m128i MulHi = _mm_clmulepi64_si128(CRCVec0, K3K4, 0b0001'0001);
