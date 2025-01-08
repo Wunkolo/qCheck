@@ -165,12 +165,47 @@ std::uint32_t
 	__m128i CRCVec3
 		= _mm_loadu_si128(&reinterpret_cast<const __m128i*>(Data.data())[3]);
 
-	Data = Data.subspan(64);
-
 	CRCVec0 = _mm_xor_si128(CRCVec0, _mm_cvtsi32_si128(CRC));
 
+	Data = Data.subspan(64);
+
 	// Fold 512 bits at a time
-	// Todo: VPCLMULQDQ(AVX2, AVX512)
+#if defined(__AVX512F__) && defined(__AVX512VL__) && defined(__VPCLMULQDQ__)
+	{
+		__m512i CRCVec_512 = _mm512_undefined();
+
+		CRCVec_512 = _mm512_inserti32x4(CRCVec_512, CRCVec0, 0);
+		CRCVec_512 = _mm512_inserti32x4(CRCVec_512, CRCVec1, 1);
+		CRCVec_512 = _mm512_inserti32x4(CRCVec_512, CRCVec2, 2);
+		CRCVec_512 = _mm512_inserti32x4(CRCVec_512, CRCVec3, 3);
+
+		const __m512i K1K2 = _mm512_set_epi64(
+			KnConstant(64 - 4, Polynomial), KnConstant(64 + 4, Polynomial),
+			KnConstant(64 - 4, Polynomial), KnConstant(64 + 4, Polynomial),
+			KnConstant(64 - 4, Polynomial), KnConstant(64 + 4, Polynomial),
+			KnConstant(64 - 4, Polynomial), KnConstant(64 + 4, Polynomial));
+
+		for( ; Data.size() >= 64; Data = Data.subspan(64) )
+		{
+
+			const __m512i MulLo
+				= _mm512_clmulepi64_epi128(CRCVec_512, K1K2, 0b0000'0000);
+
+			const __m512i MulHi
+				= _mm512_clmulepi64_epi128(CRCVec_512, K1K2, 0b0001'0001);
+
+			const __m512i Load = _mm512_loadu_si512(
+				&reinterpret_cast<const __m512i*>(Data.data())[0]);
+
+			CRCVec_512 = _mm512_xor_si512(_mm512_xor_si512(MulHi, MulLo), Load);
+		}
+
+		CRCVec0 = _mm512_extracti32x4_epi32(CRCVec_512, 0);
+		CRCVec1 = _mm512_extracti32x4_epi32(CRCVec_512, 1);
+		CRCVec2 = _mm512_extracti32x4_epi32(CRCVec_512, 2);
+		CRCVec3 = _mm512_extracti32x4_epi32(CRCVec_512, 3);
+	}
+#else
 	for( ; Data.size() >= 64; Data = Data.subspan(64) )
 	{
 		const __m128i K1K2 = _mm_set_epi64x(
@@ -200,6 +235,7 @@ std::uint32_t
 		CRCVec2 = _mm_xor_si128(_mm_xor_si128(MulHi2, MulLo2), Load2);
 		CRCVec3 = _mm_xor_si128(_mm_xor_si128(MulHi3, MulLo3), Load3);
 	}
+#endif
 
 	// Reduce 512 to 128
 	const __m128i K3K4 = _mm_set_epi64x(
