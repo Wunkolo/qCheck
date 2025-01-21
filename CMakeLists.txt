@@ -97,6 +97,13 @@ elseif( CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang" )
 
 	# add_compile_options(-march=native)
 
+	if( CMAKE_COMPILER_IS_GNUCXX )
+		# Allow neon register-types to be implicitly casted and reinterpreted
+		add_compile_options(
+			-flax-vector-conversions
+		)
+	endif()
+
 	add_compile_options(
 		-Wall
 		-Warray-bounds
