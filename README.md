@@ -1,24 +1,19 @@
 # qCheck [![GitHub license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-**Work in progress**
-
 A **q**uick alternative to cksfv for generating and verifying CRC32C checksum files(`.sfv`).
 
 ---
 
-qCheck accelerates the checksum and checksum-verification process by interfacing
-with the `.sfv` file format and using a more modern approach by utilizing both
-multi-threaded parallelism and memory-mapped IO to reduce syscall overhead.
-
-qCheck has proven itself to be about **x4** to **x15** times faster than
-alternatives such as `rhash` and `cksfv` and reduces CRC32's algorithmic
-overhead to the point of being almost entirely bounded by device IO speeds.
+qCheck is about **x4** to **x15** times faster than alternatives such as
+`rhash` and `cksfv` and reduces algorithmic overhead to being almost
+entirely bounded by device IO!
 It is recommended to run this program on a fast NVME Solid State Drive to fully
 saturate read speed.
 
 ---
 
 ## Install
+
 ### Manual
 ```
 $ git clone https://github.com/Wunkolo/qCheck.git qCheck/src
@@ -28,12 +23,14 @@ $ cmake --build qCheck/build --config Release
 ```
 
 ### Packages
+
 [ArchLinux](https://aur.archlinux.org/packages/qcheck-git)
 
 
 ## Benchmark
 
 Specs:
+
 ```
 % inxi -IC
 CPU:       Topology: 10-Core model: Intel Core i9-7900X bits: 64 type: MT MCP L2 cache: 13.8 MiB 
