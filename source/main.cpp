@@ -10,6 +10,35 @@
 
 #include <qCheck.hpp>
 
+void ProcessInputPath(Settings& CurSettings, const std::filesystem::path& Path)
+{
+	if( !std::filesystem::exists(Path) )
+	{
+		std::fprintf(stderr, "Path does not exist: %s\n", Path.c_str());
+		return;
+	}
+	std::error_code CurError;
+	// Regular files only, for now, other files will be specially handled
+	// later
+	if( std::filesystem::is_regular_file(Path, CurError) )
+	{
+		CurSettings.InputFiles.emplace_back(Path);
+	}
+	else if(
+		CurSettings.Recursive && std::filesystem::is_directory(Path, CurError) )
+	{
+		for( const std::filesystem::directory_entry& DirectoryEntry :
+			 std::filesystem::recursive_directory_iterator(Path) )
+		{
+			ProcessInputPath(CurSettings, DirectoryEntry.path());
+		}
+	}
+	else
+	{
+		std::fprintf(stderr, "Error opening path: %s\n", Path.c_str());
+	}
+}
+
 int main(int argc, char* argv[])
 {
 	Settings CurSettings = {};
@@ -68,22 +97,7 @@ int main(int argc, char* argv[])
 	for( std::intmax_t i = 0; i < argc; ++i )
 	{
 		const std::filesystem::path CurPath(argv[i]);
-		if( !std::filesystem::exists(CurPath) )
-		{
-			std::fprintf(stderr, "File does not exist: %s\n", argv[i]);
-			continue;
-		}
-		std::error_code CurError;
-		// Regular files only, for now, other files will be specially handled
-		// later
-		if( std::filesystem::is_regular_file(CurPath, CurError) )
-		{
-			CurSettings.InputFiles.emplace_back(CurPath);
-		}
-		else
-		{
-			std::fprintf(stderr, "Error opening file: %s\n", argv[i]);
-		}
+		ProcessInputPath(CurSettings, CurPath);
 	}
 
 	return CurSettings.Check ? CheckSFV(CurSettings) : GenerateSFV(CurSettings);
