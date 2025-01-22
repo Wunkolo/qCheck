@@ -163,6 +163,7 @@ static_assert(KnConstant(      4, IEEEPOLY) == 0x1DB710640);
 static_assert(MuConstant(         IEEEPOLY) == 0x1F7011641);
 // clang-format on
 
+#if defined(__ARM_FEATURE_AES)
 // Simulates the behavior of the `_mm_clmulepi64_si128` instruction found on x64
 // Ex:
 //  pmull_p64<0,0> = _mm_clmulepi64_si128(..., ..., 0b0000'0000)
@@ -181,6 +182,7 @@ inline poly64x2_t pmull_p64<1, 1>(const poly64x2_t OpA, const poly64x2_t OpB)
 {
 	return (poly64x2_t)vmull_high_p64(OpA, OpB);
 }
+#endif
 
 inline poly64x2_t
 	eor3_p64(const poly64x2_t OpA, const poly64x2_t OpB, const poly64x2_t OpC)
@@ -192,6 +194,7 @@ inline poly64x2_t
 #endif
 }
 
+#if defined(__ARM_FEATURE_AES)
 template<std::uint32_t Polynomial>
 std::uint32_t CRC32_PMULL(std::span<const std::byte> Data, std::uint32_t CRC)
 {
@@ -309,6 +312,7 @@ std::uint32_t CRC32_PMULL(std::span<const std::byte> Data, std::uint32_t CRC)
 
 	return vgetq_lane_u32(CRCVec.val[0], 1);
 }
+#endif
 
 std::uint32_t Checksum(
 	std::span<const std::byte> Data, std::uint32_t InitialValue,
@@ -318,6 +322,7 @@ std::uint32_t Checksum(
 	const auto&   Table = GetCRC32Table(Poly);
 	std::uint32_t CRC   = ~InitialValue;
 
+#if defined(__ARM_FEATURE_AES)
 	if( Poly == Polynomial::CRC32 )
 	{
 		if( Data.size() >= 64 )
@@ -335,6 +340,7 @@ std::uint32_t Checksum(
 			}
 		}
 	}
+#endif
 
 #if defined(__ARM_FEATURE_CRC32)
 	if( Poly == Polynomial::CRC32 )
