@@ -13,6 +13,16 @@
 #define __crc32cw __builtin_arm_crc32cw
 #define __crc32ch __builtin_arm_crc32ch
 #define __crc32cb __builtin_arm_crc32cb
+#else
+// From "arm_acle.h"
+#define __crc32d __builtin_aarch64_crc32x
+#define __crc32w __builtin_aarch64_crc32w
+#define __crc32h __builtin_aarch64_crc32h
+#define __crc32b __builtin_aarch64_crc32b
+#define __crc32cd __builtin_aarch64_crc32cx
+#define __crc32cw __builtin_aarch64_crc32cw
+#define __crc32ch __builtin_aarch64_crc32ch
+#define __crc32cb __builtin_aarch64_crc32cb
 #endif
 
 namespace CRC
