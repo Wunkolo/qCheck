@@ -47,6 +47,11 @@ int main(int argc, char* argv[])
 			CurSettings.Check = true;
 			break;
 		}
+		case 'r':
+		{
+			CurSettings.Recursive = true;
+			break;
+		}
 		case 'h':
 		default:
 		{
