@@ -10,6 +10,9 @@
 
 #include <qCheck.hpp>
 
+namespace
+{
+
 void ProcessInputPath(Settings& CurSettings, const std::filesystem::path& Path)
 {
 	if( !std::filesystem::exists(Path) )
@@ -18,26 +21,48 @@ void ProcessInputPath(Settings& CurSettings, const std::filesystem::path& Path)
 		return;
 	}
 	std::error_code CurError;
-	// Regular files only, for now, other files will be specially handled
-	// later
-	if( std::filesystem::is_regular_file(Path, CurError) )
+
+	if( CurSettings.Check )
 	{
-		CurSettings.InputFiles.emplace_back(Path);
-	}
-	else if(
-		CurSettings.Recursive && std::filesystem::is_directory(Path, CurError) )
-	{
-		for( const std::filesystem::directory_entry& DirectoryEntry :
-			 std::filesystem::recursive_directory_iterator(Path) )
+		// Only add .sfv files
+		if( std::filesystem::is_regular_file(Path, CurError) )
 		{
-			ProcessInputPath(CurSettings, DirectoryEntry.path());
+			const auto Extension = Path.extension();
+			if( Path.has_extension() && Extension.compare(".sfv") == 0 )
+			{
+				CurSettings.InputFiles.emplace_back(Path);
+			}
+		}
+		// Add .sfv files to check recursively
+		else if(
+			CurSettings.Recursive
+			&& std::filesystem::is_directory(Path, CurError) )
+		{
+			for( const std::filesystem::directory_entry& DirectoryEntry :
+				 std::filesystem::directory_iterator(Path) )
+			{
+				ProcessInputPath(CurSettings, DirectoryEntry.path());
+			}
+		}
+		else
+		{
+			std::fprintf(stderr, "Error opening path: %s\n", Path.c_str());
 		}
 	}
 	else
 	{
-		std::fprintf(stderr, "Error opening path: %s\n", Path.c_str());
+		if( std::filesystem::is_regular_file(Path, CurError) )
+		{
+			CurSettings.InputFiles.emplace_back(Path);
+		}
+		else
+		{
+			std::fprintf(stderr, "Error opening path: %s\n", Path.c_str());
+		}
 	}
 }
+
+} // namespace
 
 int main(int argc, char* argv[])
 {
@@ -53,8 +78,9 @@ int main(int argc, char* argv[])
 		return EXIT_SUCCESS;
 	}
 	// Parse Arguments
-	while( (Opt = getopt_long(argc, argv, "t:ch", CommandOptions, &OptionIndex))
-		   != -1 )
+	while(
+		(Opt = getopt_long(argc, argv, "t:crh", CommandOptions, &OptionIndex))
+		!= -1 )
 	{
 		switch( Opt )
 		{
