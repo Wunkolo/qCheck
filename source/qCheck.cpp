@@ -2,6 +2,7 @@
 
 #include <charconv>
 #include <fstream>
+#include <set>
 #include <span>
 #include <thread>
 
@@ -78,12 +79,14 @@ static std::optional<std::uint32_t>
 struct CheckEntry
 {
 	std::filesystem::path FilePath;
+	std::size_t           InputIndex;
 	std::uint32_t         Checksum;
 };
 
 static void CheckerThread(
 	std::atomic<std::size_t>& Passed, std::atomic<std::size_t>& QueueLock,
-	std::span<const CheckEntry> Checkqueue, std::size_t WorkerIndex)
+	std::span<const CheckEntry> Checkqueue, std::span<std::uint8_t> ErrorList,
+	std::size_t WorkerIndex)
 {
 #ifdef _POSIX_VERSION
 	char ThreadName[16] = {0};
@@ -117,10 +120,21 @@ static void CheckerThread(
 				Valid ? "\e[32m" : "\e[31m", CurSum.value(),
 				Valid ? "\e[32mOK" : "\e[31mFAIL");
 
-			Passed.fetch_add(Valid, std::memory_order_relaxed);
+			if( Valid )
+			{
+				Passed.fetch_add(1, std::memory_order_relaxed);
+			}
+			else
+			{
+				// Todo: Error code for checksum mismatch
+				ErrorList[EntryIndex] = 1;
+			}
 		}
 		else
 		{
+			// Todo: Error code for unable to checksum file
+			ErrorList[EntryIndex] = 2;
+
 			std::printf(
 				"\e[36m%s\t\e[33m%08X\t\t\e[31mError opening "
 				"file\n",
@@ -129,16 +143,19 @@ static void CheckerThread(
 	}
 }
 
-int CheckSFV(const Settings& CurSettings)
+int CheckSFVs(const Settings& CurSettings)
 {
 	std::atomic<std::size_t> QueueLock{0};
 	std::vector<CheckEntry>  Checkqueue;
-
 	// Queue up all files to be checked
 
 	std::string CurLine;
-	for( const auto& CurSfvPath : CurSettings.InputFiles )
+	for( std::size_t InputIndex = 0; InputIndex < CurSettings.InputFiles.size();
+		 ++InputIndex )
 	{
+		const std::filesystem::path& CurSfvPath
+			= CurSettings.InputFiles[InputIndex];
+
 		std::ifstream CheckFile(CurSfvPath);
 		if( !CheckFile )
 		{
@@ -177,18 +194,25 @@ int CheckSFV(const Settings& CurSettings)
 				FilePath = ".";
 			}
 			FilePath /= PathString;
-			Checkqueue.push_back(CheckEntry{FilePath, CheckValue});
+			Checkqueue.push_back(CheckEntry{
+				.FilePath   = FilePath,
+				.InputIndex = InputIndex,
+				.Checksum   = CheckValue,
+			});
 		}
 	}
 
 	std::vector<std::thread> Workers;
 	std::atomic<std::size_t> Passed{0};
 
+	// Todo: Error Codes
+	std::vector<std::uint8_t> ErrorList(Checkqueue.size(), 0);
+
 	for( std::size_t i = 0; i < CurSettings.Threads; ++i )
 	{
 		Workers.push_back(std::thread(
 			CheckerThread, std::ref(Passed), std::ref(QueueLock),
-			std::span(Checkqueue), i));
+			std::span(Checkqueue), std::span(ErrorList), i));
 	}
 
 	for( std::thread& Worker : Workers )
@@ -196,7 +220,39 @@ int CheckSFV(const Settings& CurSettings)
 		Worker.join();
 	}
 
-	return Checkqueue.size() == Passed.load() ? EXIT_SUCCESS : EXIT_FAILURE;
+	if( Checkqueue.size() == Passed.load() )
+	{
+		return EXIT_SUCCESS;
+	}
+	else
+	{
+		if( Checkqueue.size() > 1 )
+		{
+			std::set<std::size_t> FailInputs;
+
+			// Gather all inputs that lead to a failure
+			for( std::size_t EntryIndex = 0; EntryIndex < Checkqueue.size();
+				 ++EntryIndex )
+			{
+				// This entry failed
+				if( ErrorList[EntryIndex] > 0 )
+				{
+					const std::size_t InputIndex
+						= Checkqueue[EntryIndex].InputIndex;
+					FailInputs.emplace(InputIndex);
+				}
+			}
+
+			std::fputs("\nFailed SFVs:\n", stdout);
+			for( const std::size_t& InputIndex : FailInputs )
+			{
+				const std::filesystem::path& FailedInput
+					= CurSettings.InputFiles[InputIndex];
+				std::fprintf(stdout, "\e[31m%s\e[0m\n", FailedInput.c_str());
+			}
+		}
+		return EXIT_FAILURE;
+	}
 }
 
 static void GenCheckThread(

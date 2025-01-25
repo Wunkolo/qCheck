@@ -24,5 +24,5 @@ const static struct option CommandOptions[]
 	   {"help", no_argument, nullptr, 'h'},
 	   {nullptr, no_argument, nullptr, '\0'}};
 
-int CheckSFV(const Settings& CurSettings);
+int CheckSFVs(const Settings& CurSettings);
 int GenerateSFV(const Settings& CurSettings);

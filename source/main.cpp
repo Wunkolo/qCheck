@@ -126,5 +126,6 @@ int main(int argc, char* argv[])
 		ProcessInputPath(CurSettings, CurPath);
 	}
 
-	return CurSettings.Check ? CheckSFV(CurSettings) : GenerateSFV(CurSettings);
+	return CurSettings.Check ? CheckSFVs(CurSettings)
+							 : GenerateSFV(CurSettings);
 }
