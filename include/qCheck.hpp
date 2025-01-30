@@ -10,9 +10,10 @@
 struct Settings
 {
 	std::vector<std::filesystem::path> InputFiles;
-	std::size_t                        Threads = 2;
-	bool                               Verbose = true;
-	bool                               Check   = false;
+	std::size_t                        Threads   = 2;
+	bool                               Verbose   = true;
+	bool                               Check     = false;
+	bool                               Recursive = false;
 };
 
 extern const char* Usage;
@@ -23,5 +24,5 @@ const static struct option CommandOptions[]
 	   {"help", no_argument, nullptr, 'h'},
 	   {nullptr, no_argument, nullptr, '\0'}};
 
-int CheckSFV(const Settings& CurSettings);
+int CheckSFVs(const Settings& CurSettings);
 int GenerateSFV(const Settings& CurSettings);
